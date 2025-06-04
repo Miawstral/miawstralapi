@@ -1,0 +1,13 @@
+# Miawstral custom files
+javascript/miawstral.js
+javascript/*.js
+javascript/data/*.json 
+
+# node modules
+node_modules/
+flaresolverr/
+flaresolverr_windows_x64/
+flaresolverr_windows_x64.zip
+bun.lockb
+package-lock.json
+Errors/
