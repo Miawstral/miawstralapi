@@ -12,6 +12,14 @@
 | [JavaScript/TypeScript](https://github.com/Ivy-js/miawstral/tree/javascript) | [Python](https://github.com/Ivy-Js/miawstral/tree/python) 
 | :---:  | :---: |
 
+## Tech Stack 
+
+Pour Miawstral, j'utilise globalement du NodeJS pour récupèrer les arrêts et les informations fournies par [Réseau Mistral](https://www.reseaumistral.com/), afin de contourner la sécurité fournie par [Cloudflare](https://cloudflare.com/) j'ai utilisé le proxy [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr). J'ai fait tourner l'image Docker sur le port `8191 (par défaut)` afin de recevoir les données. 
+
+## Accès aux données
+A l'heure actuelle, `Miawstral` n'a accès a **aucune** de vos données personnelles. Et elle n'y aura jamais accès car nous voulons rester respectueux de vos données. Le projet est, et restera open-source.
+
+
 ## License
 
 Le projet est sous license GPL-3.0 License. Référez-vous au fichier [LICENSE](LICENSE) pour voir les conditions. 
