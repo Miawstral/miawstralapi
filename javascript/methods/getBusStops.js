@@ -26,46 +26,44 @@ async function getBusStops(bus_id) {
             return { error: 'Unexpected FlareSolverr response' };
         }
         const html = response.data.solution.response;
+        // Affiche un extrait du HTML pour le debug
+        console.log('\n[DEBUG] Extrait du HTML récupéré :\n' + html.slice(0, 500));
         if (html.includes('cf-error-details') || html.includes('Attention Required! | Cloudflare') || html.includes('You have been blocked')) {
             console.error(`[ERROR] Cloudflare page detected, access denied.`.red);
             return { error: 'Cloudflare page detected, access denied.' };
         }
         process.stdout.write('Parsing...\n'.blue);
         const $ = cheerio.load(html);
+        // New logic: Each row is a stop, each cell in the row is a time for that stop
         const stops = [];
-        // Find each stop and its city (city is usually in the next sibling or a specific class)
-        $('.is-Timesheet-StopPoint-Link').each((i, elem) => {
-            const stopName = $(elem).attr('data-stoppoint-name') || $(elem).text().trim();
-            const lat = $(elem).attr('data-lat');
-            const lon = $(elem).attr('data-lon');
-            const stopPointId = $(elem).attr('data-stoppoint-id');
-            const accessible = $(elem).attr('data-accessible') === 'true';
-            // Try to get city: look for next sibling with city info or parent context
-            let city = null;
-            const cityElem = $(elem).parent().find('.is-Timesheet-StopPoint-Locality').first();
-            if (cityElem.length) city = cityElem.text().trim();
-            // Fallback: sometimes city is in the next element
-            if (!city) {
-                const next = $(elem).next();
-                if (next && next.hasClass('is-Timesheet-StopPoint-Locality')) city = next.text().trim();
+        $(`.is-LineDirection-Timesheet tbody tr`).each((rowIdx, row) => {
+            const stopHeader = $(row).find('th.is-Timesheet-StopPoint .is-Timesheet-StopPoint-Link');
+            if (stopHeader.length === 0) return; // skip rows without stop info
+            const stop = {
+                name: stopHeader.attr('data-stoppoint-name') || stopHeader.text().trim(),
+                city: stopHeader.find('.is-Timesheet-StopPoint-City').first().text().trim() || null,
+                latitude: stopHeader.attr('data-lat') || null,
+                longitude: stopHeader.attr('data-lon') || null,
+                stopPointId: stopHeader.attr('data-stoppoint-id') || null,
+                accessible: stopHeader.find('.is-Icon-sim-accessible').length > 0,
+                times: []
+            };
+            // Find the cell with times (should be the next td after th)
+            const timeCell = $(row).find('td.is-Timesheet-Passages');
+            if (timeCell.length > 0) {
+                timeCell.find('li.is-Timesheet-Passage-Item').each((_, li) => {
+                    const time = $(li).find('.is-Timesheet-Passage-Item-C1').text().replace(/\s+/g, ' ').trim();
+                    if (time && time !== '-') stop.times.push(time);
+                });
+                // If no li, try direct text (for some tables)
+                if (stop.times.length === 0) {
+                    const time = timeCell.text().replace(/\s+/g, ' ').trim();
+                    if (time && time !== '-') stop.times.push(time);
+                }
             }
-            // Extract times for this stop (column in timetable)
-            let times = [];
-            const colIndex = i + 1;
-            $(`.is-Timesheet-Table tbody tr`).each((_, row) => {
-                const cell = $(row).find(`td:nth-child(${colIndex})`);
-                let time = cell.text().trim();
-                if (time) times.push(time);
-            });
-            stops.push({
-                name: stopName || null,
-                city: city || null,
-                latitude: lat || null,
-                longitude: lon || null,
-                stopPointId: stopPointId || null,
-                accessible,
-                times
-            });
+            // Debug log for verification
+            console.log(`[DEBUG] Stop: ${stop.name}, Times found: ${stop.times.length}`);
+            if (stop.name) stops.push(stop);
         });
         if (stops.length === 0) {
             const errorMsg = $('.is-Result-Error-Description').text().trim() || 'No stop found';
@@ -81,6 +79,26 @@ async function getBusStops(bus_id) {
         $('.is-Timesheet-Note').each((i, elem) => {
             notes.push($(elem).text().trim());
         });
+        // On filtre les arrêts qui ont au moins un horaire
+        const stopsWithTimes = stops.filter(stop => stop.times.length > 0);
+        // Si on exécute en CLI, on écrit ce JSON dans le nouveau dossier
+        if (require.main === module) {
+            const fs = require('fs');
+            const path = require('path');
+            const outDir = path.join(__dirname, '../data_horaires');
+            if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
+            const outFile = path.join(outDir, `${bus_id}_horaires.json`);
+            const horairesJson = {
+                bus_id,
+                lineName,
+                direction,
+                lineId,
+                stops: stopsWithTimes,
+                notes
+            };
+            fs.writeFileSync(outFile, JSON.stringify(horairesJson, null, 2), 'utf-8');
+            console.log(`\n[INFO] Fichier créé : ${outFile}`);
+        }
         return {
             bus_id,
             lineName,
@@ -101,6 +119,24 @@ async function getBusStops(bus_id) {
         console.error(`[ERROR] Scraping failed`.red, error);
         return { error: error.message || 'Scraping failed' };
     }
+}
+
+// CLI wrapper for direct execution and debug
+if (require.main === module) {
+    const busId = process.argv[2] || '87';
+    getBusStops(busId).then(result => {
+        // Print result summary
+        if (result && result.stops) {
+            console.log(`\n[RESULT] Bus ${busId}: ${result.stops.length} stops`);
+            result.stops.forEach(stop => {
+                console.log(`[STOP] ${stop.name} (${stop.city}) - ${stop.times.length} times`);
+            });
+        } else {
+            console.log(result);
+        }
+    }).catch(err => {
+        console.error('[ERROR]', err);
+    });
 }
 
 module.exports = { getBusStops };
