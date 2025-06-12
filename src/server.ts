@@ -1,0 +1,31 @@
+// src/server.ts
+import express, { Application, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import lineRouter from './api/lines/lines.routes';
+import stopsRouter from './api/stops/stops.routes';
+const app: Application = express();
+const PORT = process.env.PORT || 3000;
+
+
+app.use(cors());
+app.use(express.json());
+
+
+app.use('/api/lines', lineRouter);
+app.use('/api/stops', stopsRouter)
+
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    console.error(`[ERROR] ${req.method} ${req.path} - ${err.message}`)
+
+    const errorMessage = process.env.NODE_ENV === 'production' ? 'An internal server error occured' : err.message;
+    res.status(500).json({
+        success: false,
+        message: errorMessage,
+    })
+});
+
+
+app.listen(PORT, () => {
+    console.log(`[📦] Miawstral is running on http://localhost:${PORT}`);
+});

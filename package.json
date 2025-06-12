@@ -1,21 +1,39 @@
 {
   "name": "reseau-miawstral",
   "version": "1.0.0",
-  "description": "![](./Public/github_header.png)",
-  "main": "index.js",
+  "description": "API pour le Réseau Mistral de la métropole Toulon Provence Méditerranée.",
+  "main": "dist/server.js",
   "scripts": {
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "reseau-mistral",
+    "api",
+    "toulon",
+    "bus"
+  ],
+  "author": "Ivy-Js",
+  "license": "GPL-3.0-or-later",
   "dependencies": {
     "axios": "^1.9.0",
     "cheerio": "^1.0.0",
     "colors": "^1.4.0",
-    "express": "^5.1.0",
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7",
-    "puppeteer": "^24.10.0"
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "puppeteer": "^24.10.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.2",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.5"
   }
 }

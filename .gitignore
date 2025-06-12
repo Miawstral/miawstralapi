@@ -2,6 +2,10 @@
 javascript/miawstral.js
 javascript/*.js
 javascript/data/*.json 
+javascript/loaders/load_data.js
+javascript/loaders/load_one.js
+javascript/loaders/miawstral.js
+
 
 # node modules
 node_modules/
@@ -11,3 +15,4 @@ flaresolverr_windows_x64.zip
 bun.lockb
 package-lock.json
 Errors/
+bun.lock

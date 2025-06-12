@@ -9,7 +9,8 @@ require('colors');
  */
 async function getBusStops(bus_id) {
     if(bus_id < 9) bus_id = `0${bus_id}` 
-    const url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/${bus_id}/direction/OUTWARD/MISTRAL:00${bus_id}?islid=MISTRAL%3A00${bus_id}&ismode=Bus&islsn=${bus_id}&issubnet=Reseau%20Mistral&isdir=OUTWARD&w=true&date=`;
+    let url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/${bus_id}/direction/OUTWARD/MISTRAL:00${bus_id}?islid=MISTRAL%3A00${bus_id}&ismode=Bus&islsn=${bus_id}&issubnet=Reseau%20Mistral&isdir=OUTWARD&w=true&date=`;
+    if(bus_id.toLocaleUpperCase() === "U") url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/U/direction/OUTWARD/MISTRAL:U`
     const apiUrl = 'http://localhost:8191/v1';
     const data = {
         cmd: 'request.get',
@@ -17,7 +18,6 @@ async function getBusStops(bus_id) {
         maxTimeout: 60000
     };
     try {
-        process.stdout.write(`[Miawstral] [${bus_id}] FlareSolverr request... `.cyan);
         const response = await axios.post(apiUrl, data, {
             headers: { 'Content-Type': 'application/json' }
         });
@@ -26,8 +26,6 @@ async function getBusStops(bus_id) {
             return { error: 'Unexpected FlareSolverr response' };
         }
         const html = response.data.solution.response;
-        // Affiche un extrait du HTML pour le debug
-        console.log('\n[DEBUG] Extrait du HTML récupéré :\n' + html.slice(0, 500));
         if (html.includes('cf-error-details') || html.includes('Attention Required! | Cloudflare') || html.includes('You have been blocked')) {
             console.error(`[ERROR] Cloudflare page detected, access denied.`.red);
             return { error: 'Cloudflare page detected, access denied.' };
@@ -61,13 +59,11 @@ async function getBusStops(bus_id) {
                     if (time && time !== '-') stop.times.push(time);
                 }
             }
-            // Debug log for verification
-            console.log(`[DEBUG] Stop: ${stop.name}, Times found: ${stop.times.length}`);
             if (stop.name) stops.push(stop);
         });
         if (stops.length === 0) {
             const errorMsg = $('.is-Result-Error-Description').text().trim() || 'No stop found';
-            console.warn(`[WARN] No stop found. Message: ${errorMsg}`.yellow);
+            console.warn(`[WARN] No stop found.`.yellow);
             return { error: errorMsg };
         } else {
             process.stdout.write(`[OK] ${stops.length} stops found\n`.green);
@@ -79,9 +75,8 @@ async function getBusStops(bus_id) {
         $('.is-Timesheet-Note').each((i, elem) => {
             notes.push($(elem).text().trim());
         });
-        // On filtre les arrêts qui ont au moins un horaire
+        
         const stopsWithTimes = stops.filter(stop => stop.times.length > 0);
-        // Si on exécute en CLI, on écrit ce JSON dans le nouveau dossier
         if (require.main === module) {
             const fs = require('fs');
             const path = require('path');
@@ -121,11 +116,10 @@ async function getBusStops(bus_id) {
     }
 }
 
-// CLI wrapper for direct execution and debug
+
 if (require.main === module) {
-    const busId = process.argv[2] || '87';
+    const busId = process.argv[2];
     getBusStops(busId).then(result => {
-        // Print result summary
         if (result && result.stops) {
             console.log(`\n[RESULT] Bus ${busId}: ${result.stops.length} stops`);
             result.stops.forEach(stop => {
