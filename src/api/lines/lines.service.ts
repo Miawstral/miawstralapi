@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { BusLine } from '../../interfaces/BusData';
+import { getAll } from './lines.controller';
 
 
 const dataDir = path.join(__dirname, '../../data');
@@ -37,3 +38,18 @@ export const getLineById = async (id: string): Promise<BusLine> => {
   const fileContent = fs.readFileSync(filePath, 'utf-8');
   return JSON.parse(fileContent);
 };
+
+/**
+ * Searches for lines by name. 
+ * @param {string} query  - The Search query 
+ * @returns {Promise<Partial<BusLine>[]>} A list of matching line summaries. 
+ */
+
+export const searchLinesByName = async (query: string): Promise<Partial<BusLine>[]> => {
+  const allLines = await getAllLines(); 
+  const lowerCaseQuery = query.toLowerCase(); 
+
+  return allLines.filter(line => 
+    line.lineName?.toLowerCase().includes(lowerCaseQuery)
+  )
+}

@@ -22,3 +22,24 @@ export const getById = async (req: Request, res: Response, next: NextFunction) =
     next(error);
   }
 };
+
+export const search = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query = req.query.q; 
+    console.log(query)
+  
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        success : false, 
+        message: "Query parameter 'q' is required."
+      });
+    }
+
+    const lines = await linesService.searchLinesByName(query); 
+    res.status(200).json(lines)
+
+  }
+  catch (err){
+    next(err)
+  }
+}
