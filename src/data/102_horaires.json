@@ -1,0 +1,327 @@
+{
+  "bus_id": "102",
+  "lineName": "Gare Rte Tln-Aéroport Hyères",
+  "direction": "OUTWARD",
+  "lineId": "MISTRAL:0102",
+  "stops": [
+    {
+      "name": "Aéroport Toulon Hyeres",
+      "city": "Hyères",
+      "latitude": "43.09339",
+      "longitude": "6.15913",
+      "stopPointId": "MISTRAL:HYATHT",
+      "accessible": true,
+      "times": [
+        "8:15",
+        "11:20",
+        "14:15",
+        "16:00",
+        "21:55"
+      ]
+    },
+    {
+      "name": "Aéroport",
+      "city": "Hyères",
+      "latitude": "43.09025",
+      "longitude": "6.15984",
+      "stopPointId": "MISTRAL:HYAERO",
+      "accessible": true,
+      "times": [
+        "8:16",
+        "11:21",
+        "14:16",
+        "16:01",
+        "21:56"
+      ]
+    },
+    {
+      "name": "Pins Maritimes",
+      "city": "Hyères",
+      "latitude": "43.09362",
+      "longitude": "6.16399",
+      "stopPointId": "MISTRAL:HYPMAE",
+      "accessible": true,
+      "times": [
+        "8:17",
+        "11:22",
+        "14:17",
+        "16:02",
+        "21:57"
+      ]
+    },
+    {
+      "name": "Plein Sud",
+      "city": "Hyères",
+      "latitude": "43.09665",
+      "longitude": "6.16704",
+      "stopPointId": "MISTRAL:HYPSUE",
+      "accessible": true,
+      "times": [
+        "8:18",
+        "11:23",
+        "14:18",
+        "16:03",
+        "21:58"
+      ]
+    },
+    {
+      "name": "Ceinturon",
+      "city": "Hyères",
+      "latitude": "43.10041",
+      "longitude": "6.17083",
+      "stopPointId": "MISTRAL:HYCEIE",
+      "accessible": true,
+      "times": [
+        "8:19",
+        "11:24",
+        "14:19",
+        "16:04",
+        "21:59"
+      ]
+    },
+    {
+      "name": "Daviddi",
+      "city": "Hyères",
+      "latitude": "43.10441",
+      "longitude": "6.17479",
+      "stopPointId": "MISTRAL:HYDAVE",
+      "accessible": true,
+      "times": [
+        "8:20",
+        "11:25",
+        "14:20",
+        "16:05",
+        "22:00"
+      ]
+    },
+    {
+      "name": "Ayguade",
+      "city": "Hyères",
+      "latitude": "43.10612",
+      "longitude": "6.17547",
+      "stopPointId": "MISTRAL:HYAYGE",
+      "accessible": true,
+      "times": [
+        "8:21",
+        "11:26",
+        "14:21",
+        "16:06",
+        "22:01"
+      ]
+    },
+    {
+      "name": "Fontètes",
+      "city": "Hyères",
+      "latitude": "43.11071",
+      "longitude": "6.16871",
+      "stopPointId": "MISTRAL:HYFONN",
+      "accessible": true,
+      "times": [
+        "8:22",
+        "11:27",
+        "14:22",
+        "16:07",
+        "22:02"
+      ]
+    },
+    {
+      "name": "Pierre du Moulin",
+      "city": "Hyères",
+      "latitude": "43.11504",
+      "longitude": "6.15547",
+      "stopPointId": "MISTRAL:HYPDMN",
+      "accessible": true,
+      "times": [
+        "8:23",
+        "11:28",
+        "14:23",
+        "16:09",
+        "22:03"
+      ]
+    },
+    {
+      "name": "Skate Park",
+      "city": "Hyères",
+      "latitude": "43.11667",
+      "longitude": "6.14617",
+      "stopPointId": "MISTRAL:HYSKPE",
+      "accessible": true,
+      "times": [
+        "8:24",
+        "11:30",
+        "14:25",
+        "16:10",
+        "22:05"
+      ]
+    },
+    {
+      "name": "Simenon",
+      "city": "Hyères",
+      "latitude": "43.11567",
+      "longitude": "6.13326",
+      "stopPointId": "MISTRAL:HYSIME",
+      "accessible": true,
+      "times": [
+        "8:25",
+        "11:31",
+        "14:26",
+        "16:12",
+        "22:06"
+      ]
+    },
+    {
+      "name": "Hôtel de Ville (Hyères)",
+      "city": "Hyères",
+      "latitude": "43.11993",
+      "longitude": "6.12876",
+      "stopPointId": "MISTRAL:HYHOTN",
+      "accessible": true,
+      "times": [
+        "8:26",
+        "11:32",
+        "14:27",
+        "16:13",
+        "22:07"
+      ]
+    },
+    {
+      "name": "Soldat Bellon",
+      "city": "Hyères",
+      "latitude": "43.11846",
+      "longitude": "6.12782",
+      "stopPointId": "MISTRAL:HYBELO",
+      "accessible": true,
+      "times": [
+        "8:27",
+        "11:33",
+        "14:28",
+        "16:14",
+        "22:08"
+      ]
+    },
+    {
+      "name": "Clinique Ste Marguerite",
+      "city": "Hyères",
+      "latitude": "43.11497",
+      "longitude": "6.12309",
+      "stopPointId": "MISTRAL:HYCSMO",
+      "accessible": true,
+      "times": [
+        "8:31",
+        "11:38",
+        "14:33",
+        "16:19",
+        "22:13"
+      ]
+    },
+    {
+      "name": "Ste Musse A57",
+      "city": "Toulon",
+      "latitude": "43.12576",
+      "longitude": "5.97204",
+      "stopPointId": "MISTRAL:TOA57N",
+      "accessible": true,
+      "times": [
+        "8:45",
+        "11:54",
+        "14:49",
+        "16:38",
+        "22:27"
+      ]
+    },
+    {
+      "name": "Malon",
+      "city": "Toulon",
+      "latitude": "43.12201",
+      "longitude": "5.95464",
+      "stopPointId": "MISTRAL:TOMALN",
+      "accessible": true,
+      "times": [
+        "8:46",
+        "11:56",
+        "14:51",
+        "16:40",
+        "22:29"
+      ]
+    },
+    {
+      "name": "Bourgeois",
+      "city": "Toulon",
+      "latitude": "43.12032",
+      "longitude": "5.94811",
+      "stopPointId": "MISTRAL:TOBOUN",
+      "accessible": true,
+      "times": [
+        "8:48",
+        "11:58",
+        "14:53",
+        "16:42",
+        "22:31"
+      ]
+    },
+    {
+      "name": "Champ de Mars",
+      "city": "Toulon",
+      "latitude": "43.12208",
+      "longitude": "5.9405",
+      "stopPointId": "MISTRAL:TOCMAN",
+      "accessible": true,
+      "times": [
+        "8:50",
+        "12:00",
+        "14:55",
+        "16:44",
+        "22:33"
+      ]
+    },
+    {
+      "name": "Clemenceau",
+      "city": "Toulon",
+      "latitude": "43.12357",
+      "longitude": "5.93752",
+      "stopPointId": "MISTRAL:TOCLEN",
+      "accessible": true,
+      "times": [
+        "8:51",
+        "12:01",
+        "14:56",
+        "16:45",
+        "22:34"
+      ]
+    },
+    {
+      "name": "Fabié",
+      "city": "Toulon",
+      "latitude": "43.12487",
+      "longitude": "5.9361",
+      "stopPointId": "MISTRAL:TOFABE",
+      "accessible": true,
+      "times": [
+        "8:51",
+        "12:01",
+        "14:56",
+        "16:46",
+        "22:34"
+      ]
+    },
+    {
+      "name": "Gare Routière (Toulon)",
+      "city": "Toulon",
+      "latitude": "43.1276",
+      "longitude": "5.93122",
+      "stopPointId": "MISTRAL:TOGR06",
+      "accessible": true,
+      "times": [
+        "8:53",
+        "12:03",
+        "14:58",
+        "16:48",
+        "22:36"
+      ]
+    }
+  ],
+  "notes": [],
+  "cachedAt": "2025-09-13T01:45:37.102Z",
+  "totalStops": 21,
+  "totalTimes": 105
+}

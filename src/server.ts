@@ -3,6 +3,8 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import lineRouter from './api/lines/lines.routes';
 import stopsRouter from './api/stops/stops.routes';
+import cacheRouter from './api/cache/cache.routes';
+import mainPage from './pages/main';
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
 
@@ -12,7 +14,9 @@ app.use(express.json());
 
 
 app.use('/api/lines', lineRouter);
-app.use('/api/stops', stopsRouter)
+app.use('/api/stops', stopsRouter);
+app.use('/refresh', cacheRouter);
+app.use('/', mainPage);
 
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

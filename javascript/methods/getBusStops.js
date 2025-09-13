@@ -8,10 +8,25 @@ require('colors');
  * @returns {Promise<Array|Object>} List of stops or detailed error object
  */
 async function getBusStops(bus_id) {
-    if(bus_id < 9) bus_id = `0${bus_id}` 
-    let url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/${bus_id}/direction/OUTWARD/MISTRAL:00${bus_id}?islid=MISTRAL%3A00${bus_id}&ismode=Bus&islsn=${bus_id}&issubnet=Reseau%20Mistral&isdir=OUTWARD&w=true&date=`;
-    if(bus_id.toLocaleUpperCase() === "U") url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/U/direction/OUTWARD/MISTRAL:U`
-    const apiUrl = 'http://localhost:8191/v1';
+    // Format bus_id: add leading zero only for numbers 1-9, not for 10+ or letters
+    const originalBusId = bus_id;
+    const numericId = parseInt(bus_id);
+    
+    let formattedId = bus_id;
+    if (!isNaN(numericId) && numericId < 10 && numericId > 0) {
+        formattedId = `000${bus_id}`;
+    }
+    if(numericId > 10 && numericId < 100) { 
+        formattedId = `00${bus_id}`
+    } 
+    if (numericId > 100) {
+        formattedId = `0${bus_id}`
+    }
+    console.log(formattedId)
+    // For URLs: use formatted ID for MISTRAL codes, original for ligne path
+    let url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/${originalBusId}/direction/OUTWARD/MISTRAL:${formattedId}?islid=MISTRAL%3A${formattedId}&ismode=Bus&islsn=${originalBusId}&issubnet=Reseau%20Mistral&isdir=OUTWARD&w=true&date=`;
+    if(bus_id.toString().toUpperCase() === "U") url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/U/direction/OUTWARD/MISTRAL:U`
+    const apiUrl = 'http://127.0.0.0:8191/v1';
     const data = {
         cmd: 'request.get',
         url: url,
@@ -82,9 +97,9 @@ async function getBusStops(bus_id) {
             const path = require('path');
             const outDir = path.join(__dirname, '../data_horaires');
             if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
-            const outFile = path.join(outDir, `${bus_id}_horaires.json`);
+            const outFile = path.join(outDir, `${originalBusId}_horaires.json`);
             const horairesJson = {
-                bus_id,
+                bus_id: originalBusId,
                 lineName,
                 direction,
                 lineId,
@@ -95,7 +110,7 @@ async function getBusStops(bus_id) {
             console.log(`\n[INFO] Fichier créé : ${outFile}`);
         }
         return {
-            bus_id,
+            bus_id: originalBusId,
             lineName,
             direction,
             lineId,
@@ -109,7 +124,7 @@ async function getBusStops(bus_id) {
         if (!fs.existsSync(errorsDir)) {
             fs.mkdirSync(errorsDir);
         }
-        const errorFile = path.join(errorsDir, `${bus_id}.log`);
+        const errorFile = path.join(errorsDir, `${originalBusId}.log`);
         fs.writeFileSync(errorFile, error && error.stack ? error.stack : String(error), 'utf-8');
         console.error(`[ERROR] Scraping failed`.red, error);
         return { error: error.message || 'Scraping failed' };
@@ -119,17 +134,17 @@ async function getBusStops(bus_id) {
 
 if (require.main === module) {
     const busId = process.argv[2];
+    if (!busId) {
+        console.error('Usage: node getBusStops.js <busId>');
+        process.exit(1);
+    }
+    
     getBusStops(busId).then(result => {
-        if (result && result.stops) {
-            console.log(`\n[RESULT] Bus ${busId}: ${result.stops.length} stops`);
-            result.stops.forEach(stop => {
-                console.log(`[STOP] ${stop.name} (${stop.city}) - ${stop.times.length} times`);
-            });
-        } else {
-            console.log(result);
-        }
+        // Output JSON to stdout for TypeScript consumption
+        console.log(JSON.stringify(result));
     }).catch(err => {
-        console.error('[ERROR]', err);
+        console.error(JSON.stringify({ error: err.message || 'Unknown error' }));
+        process.exit(1);
     });
 }
 

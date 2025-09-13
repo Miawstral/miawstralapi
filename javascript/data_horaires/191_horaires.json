@@ -1,0 +1,471 @@
+{
+  "bus_id": "191",
+  "lineName": "Observatoire - Tourrache",
+  "direction": "OUTWARD",
+  "lineId": "MISTRAL:0191",
+  "stops": [
+    {
+      "name": "CAT Vert",
+      "city": "La Farlède",
+      "latitude": "43.15587",
+      "longitude": "6.04936",
+      "stopPointId": "MISTRAL:GACATT",
+      "accessible": true,
+      "times": [
+        "- - - - - - - - - -"
+      ]
+    },
+    {
+      "name": "Schweitzer",
+      "city": "La Garde",
+      "latitude": "43.14978",
+      "longitude": "6.04008",
+      "stopPointId": "MISTRAL:GASCHO",
+      "accessible": true,
+      "times": [
+        "- - - - - - - - - -"
+      ]
+    },
+    {
+      "name": "Tourrache",
+      "city": "La Crau",
+      "latitude": "43.14909",
+      "longitude": "6.04528",
+      "stopPointId": "MISTRAL:GATOUO",
+      "accessible": true,
+      "times": [
+        "6:40",
+        "8:00",
+        "9:20",
+        "10:45",
+        "12:05",
+        "13:35",
+        "14:55",
+        "16:20",
+        "17:50",
+        "19:10"
+      ]
+    },
+    {
+      "name": "ZI Toulon Est",
+      "city": "La Garde",
+      "latitude": "43.14607",
+      "longitude": "6.03978",
+      "stopPointId": "MISTRAL:GAZITO",
+      "accessible": true,
+      "times": [
+        "6:42",
+        "8:02",
+        "9:22",
+        "10:47",
+        "12:07",
+        "13:37",
+        "14:57",
+        "16:22",
+        "17:52",
+        "19:12"
+      ]
+    },
+    {
+      "name": "Draguignan",
+      "city": "La Garde",
+      "latitude": "43.14287",
+      "longitude": "6.0373",
+      "stopPointId": "MISTRAL:GADRAO",
+      "accessible": true,
+      "times": [
+        "6:43",
+        "8:03",
+        "9:23",
+        "10:48",
+        "12:08",
+        "13:38",
+        "14:59",
+        "16:24",
+        "17:53",
+        "19:13"
+      ]
+    },
+    {
+      "name": "Pôle d'Activité Toulon Est",
+      "city": "La Garde",
+      "latitude": "43.14068",
+      "longitude": "6.03525",
+      "stopPointId": "MISTRAL:GAPATO",
+      "accessible": true,
+      "times": [
+        "6:43",
+        "8:03",
+        "9:23",
+        "10:49",
+        "12:09",
+        "13:39",
+        "15:01",
+        "16:26",
+        "17:54",
+        "19:14"
+      ]
+    },
+    {
+      "name": "Ste Marie",
+      "city": "La Garde",
+      "latitude": "43.13843",
+      "longitude": "6.03271",
+      "stopPointId": "MISTRAL:GASMAO",
+      "accessible": true,
+      "times": [
+        "6:44",
+        "8:04",
+        "9:24",
+        "10:50",
+        "12:10",
+        "13:40",
+        "15:02",
+        "16:27",
+        "17:55",
+        "19:14"
+      ]
+    },
+    {
+      "name": "4 Chemins (Pauline)",
+      "city": "La Garde",
+      "latitude": "43.13772",
+      "longitude": "6.02763",
+      "stopPointId": "MISTRAL:GA4CH1",
+      "accessible": true,
+      "times": [
+        "6:45",
+        "8:05",
+        "9:25",
+        "10:51",
+        "12:11",
+        "13:41",
+        "15:04",
+        "16:29",
+        "17:56",
+        "19:15"
+      ]
+    },
+    {
+      "name": "4 Chemins (Pauline)",
+      "city": "La Garde",
+      "latitude": "43.13794",
+      "longitude": "6.02491",
+      "stopPointId": "MISTRAL:GA4CH5",
+      "accessible": true,
+      "times": [
+        "6:45",
+        "8:05",
+        "9:25",
+        "10:52",
+        "12:12",
+        "13:42",
+        "15:05",
+        "16:30",
+        "17:57",
+        "19:16"
+      ]
+    },
+    {
+      "name": "Campus La Garde/La Valette",
+      "city": "La Garde",
+      "latitude": "43.1383",
+      "longitude": "6.01837",
+      "stopPointId": "MISTRAL:GACAMN",
+      "accessible": true,
+      "times": [
+        "6:46",
+        "8:06",
+        "9:26",
+        "10:53",
+        "12:13",
+        "13:43",
+        "15:08",
+        "16:33",
+        "17:58",
+        "19:17"
+      ]
+    },
+    {
+      "name": "Campus",
+      "city": "La Valette-du-Var",
+      "latitude": "43.13787",
+      "longitude": "6.01397",
+      "stopPointId": "MISTRAL:VACAMN",
+      "accessible": true,
+      "times": [
+        "6:47",
+        "8:07",
+        "9:27",
+        "10:54",
+        "12:15",
+        "13:45",
+        "15:10",
+        "16:35",
+        "18:00",
+        "19:18"
+      ]
+    },
+    {
+      "name": "Av de l'Université",
+      "city": "La Valette-du-Var",
+      "latitude": "43.13739",
+      "longitude": "6.00682",
+      "stopPointId": "MISTRAL:VAAVUN",
+      "accessible": true,
+      "times": [
+        "6:48",
+        "8:08",
+        "9:28",
+        "10:56",
+        "12:17",
+        "13:47",
+        "15:12",
+        "16:39",
+        "18:04",
+        "19:20"
+      ]
+    },
+    {
+      "name": "Espaluns",
+      "city": "La Valette-du-Var",
+      "latitude": "43.13697",
+      "longitude": "6.00178",
+      "stopPointId": "MISTRAL:VAESP1",
+      "accessible": true,
+      "times": [
+        "6:49",
+        "8:09",
+        "9:29",
+        "10:57",
+        "12:18",
+        "13:48",
+        "15:14",
+        "16:41",
+        "18:06",
+        "19:21"
+      ]
+    },
+    {
+      "name": "Fourches",
+      "city": "La Valette-du-Var",
+      "latitude": "43.1371",
+      "longitude": "5.99925",
+      "stopPointId": "MISTRAL:VAFOUN",
+      "accessible": true,
+      "times": [
+        "6:50",
+        "8:10",
+        "9:30",
+        "10:58",
+        "12:19",
+        "13:49",
+        "15:15",
+        "16:42",
+        "18:07",
+        "19:22"
+      ]
+    },
+    {
+      "name": "Ste Musse A57",
+      "city": "Toulon",
+      "latitude": "43.12576",
+      "longitude": "5.97204",
+      "stopPointId": "MISTRAL:TOA57N",
+      "accessible": true,
+      "times": [
+        "6:53",
+        "8:13",
+        "9:33",
+        "11:02",
+        "12:23",
+        "13:53",
+        "15:19",
+        "16:46",
+        "18:11",
+        "19:26"
+      ]
+    },
+    {
+      "name": "Malon",
+      "city": "Toulon",
+      "latitude": "43.12201",
+      "longitude": "5.95464",
+      "stopPointId": "MISTRAL:TOMALN",
+      "accessible": true,
+      "times": [
+        "6:55",
+        "8:15",
+        "9:35",
+        "11:04",
+        "12:25",
+        "13:55",
+        "15:21",
+        "16:48",
+        "18:13",
+        "19:28"
+      ]
+    },
+    {
+      "name": "Bourgeois",
+      "city": "Toulon",
+      "latitude": "43.12032",
+      "longitude": "5.94811",
+      "stopPointId": "MISTRAL:TOBOUN",
+      "accessible": true,
+      "times": [
+        "6:56",
+        "8:16",
+        "9:37",
+        "11:06",
+        "12:27",
+        "13:57",
+        "15:23",
+        "16:50",
+        "18:15",
+        "19:30"
+      ]
+    },
+    {
+      "name": "Champ de Mars",
+      "city": "Toulon",
+      "latitude": "43.12208",
+      "longitude": "5.9405",
+      "stopPointId": "MISTRAL:TOCMAN",
+      "accessible": true,
+      "times": [
+        "6:58",
+        "8:18",
+        "9:39",
+        "11:08",
+        "12:29",
+        "13:59",
+        "15:26",
+        "16:53",
+        "18:18",
+        "19:32"
+      ]
+    },
+    {
+      "name": "Clemenceau",
+      "city": "Toulon",
+      "latitude": "43.12357",
+      "longitude": "5.93752",
+      "stopPointId": "MISTRAL:TOCLEN",
+      "accessible": true,
+      "times": [
+        "6:59",
+        "8:19",
+        "9:40",
+        "11:10",
+        "12:31",
+        "14:01",
+        "15:27",
+        "16:54",
+        "18:19",
+        "19:34"
+      ]
+    },
+    {
+      "name": "Strasbourg",
+      "city": "Toulon",
+      "latitude": "43.12468",
+      "longitude": "5.93404",
+      "stopPointId": "MISTRAL:TOSTRN",
+      "accessible": true,
+      "times": [
+        "7:00",
+        "8:20",
+        "9:41",
+        "11:11",
+        "12:32",
+        "14:02",
+        "15:29",
+        "16:56",
+        "18:21",
+        "19:35"
+      ]
+    },
+    {
+      "name": "Liberté",
+      "city": "Toulon",
+      "latitude": "43.12544",
+      "longitude": "5.93009",
+      "stopPointId": "MISTRAL:TOLIBI",
+      "accessible": true,
+      "times": [
+        "7:01",
+        "8:21",
+        "9:42",
+        "11:12",
+        "12:33",
+        "14:03",
+        "15:30",
+        "16:57",
+        "18:22",
+        "19:36"
+      ]
+    },
+    {
+      "name": "Péri / Obs",
+      "city": "Toulon",
+      "latitude": "43.12621",
+      "longitude": "5.92632",
+      "stopPointId": "MISTRAL:TOPOBN",
+      "accessible": true,
+      "times": [
+        "7:02",
+        "8:22",
+        "9:43",
+        "11:13",
+        "12:34",
+        "14:04",
+        "15:31",
+        "16:58",
+        "18:23",
+        "19:37"
+      ]
+    },
+    {
+      "name": "Castigneau",
+      "city": "Toulon",
+      "latitude": "43.12676",
+      "longitude": "5.92341",
+      "stopPointId": "MISTRAL:TOCASN",
+      "accessible": true,
+      "times": [
+        "7:03",
+        "8:23",
+        "9:44",
+        "11:14",
+        "12:35",
+        "14:05",
+        "15:32",
+        "16:59",
+        "18:24",
+        "19:38"
+      ]
+    },
+    {
+      "name": "Observatoire",
+      "city": "Toulon",
+      "latitude": "43.12749",
+      "longitude": "5.92215",
+      "stopPointId": "MISTRAL:TOOBSS",
+      "accessible": true,
+      "times": [
+        "7:04",
+        "8:24",
+        "9:45",
+        "11:15",
+        "12:36",
+        "14:06",
+        "15:33",
+        "17:00",
+        "18:25",
+        "19:39"
+      ]
+    }
+  ],
+  "notes": []
+}
