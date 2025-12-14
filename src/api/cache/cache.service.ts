@@ -52,6 +52,11 @@ export class CacheService {
     private readonly dataDir = path.join(__dirname, '../../data');
     private readonly workingLinesFile = path.join(__dirname, '../../data/working_lines.json');
 
+    private readonly BATCH_SIZE = 5
+    private readonly BATCH_DELAY = 500
+    private readonly MAX_RETRIES = 3
+    private readonly CACHE_TTL = 24 * 60 * 60 * 1000;
+
     constructor() {
         // Ensure data directory exists
         if (!fs.existsSync(this.dataDir)) {
@@ -122,6 +127,32 @@ export class CacheService {
         console.log(`${colors[color]}${message}${colors.reset}`);
     }
 
+    private async getBusStopsWithRetry(lineId: string): Promise<BusData> {
+        let lastError: Error | null = null;
+        for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+            try {
+                return await this.getBusStops(lineId);
+            } catch (error) {
+                lastError = error instanceof Error ? error : new Error('Unkown error occured.');
+
+                if (attempt < this.MAX_RETRIES) {
+                    const delay = Math.pow(2, attempt) * 1000;
+                    this.log(`[RETRY] Line ${lineId} - Attempt ${attempt}/${this.MAX_RETRIES}, waiting ${delay}ms...`, 'yellow');
+                    await this.delay(delay);
+                }
+            }
+        }
+        return {
+            bus_id: lineId,
+            lineName: null,
+            direction: null,
+            lineId: lineId,
+            stops: [],
+            notes: [],
+            error: lastError?.message || 'Max retries exceeded'
+        }
+    }
+
     /**
      * Call the JavaScript getBusStops function
      */
@@ -156,6 +187,7 @@ export class CacheService {
      * Fetches all bus lines and caches them (smart mode: uses cached working lines if available)
      */
     async refreshAllLines(): Promise<CacheResult> {
+        const startTime = Date.now();
         const linesToTest = this.getLinesToTest();
         const usingCache = this.loadWorkingLines() !== null;
         
@@ -174,25 +206,32 @@ export class CacheService {
 
         const workingLines: string[] = [];
 
-        // Process each line
-        for (const lineId of linesToTest) {
-            const success = await this.processLine(lineId, result);
-            if (success) {
-                workingLines.push(lineId);
+        for (let i = 0; i < linesToTest.length; i+= this.BATCH_SIZE) {
+            const batch = linesToTest.slice(i, i + this.BATCH_SIZE);
+            const batchNumber = Math.floor(i / this.BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(linesToTest.length / this.BATCH_SIZE);
+
+            this.log(`[BATCH ${batchNumber}/${totalBatches}] — Processing lines: ${batch.join(', ')}`, 'cyan');
+            const batchResults = await Promise.all(
+                batch.map(lineId => this.processLine(lineId, result))
+            );
+
+            batch.forEach((lineId, idx) => {
+                if (batchResults[idx]) {
+                    workingLines.push(lineId);
+                }
+            });
+
+            if (i + this.BATCH_SIZE < linesToTest.length) {
+                this.log(`[PAUSE] Waiting ${this.BATCH_DELAY}ms before next batch...`, 'blue');
+                await this.delay(this.BATCH_DELAY);
             }
-            
-            // Small delay to avoid overwhelming the server
-            await this.delay(100);
         }
-
-        // Save working lines for next time
         this.saveWorkingLines(workingLines);
-
-        // Generate summary
-        result.summary = this.generateSummary(result, usingCache);
+        const duration = Date.now() - startTime;
+        result.summary = this.generateSummary(result, usingCache, duration);
         console.log(result.summary);
-
-        return result;
+        return result
     }
 
     /**
@@ -203,7 +242,7 @@ export class CacheService {
         try {
             this.log(`[INFO] Processing line ${lineId}...`, 'blue');
             
-            const data = await this.getBusStops(lineId);
+            const data = await this.getBusStopsWithRetry(lineId);
             
             if (data.error) {
                 this.log(`[ERROR] Line ${lineId}: ${data.error}`, 'red');
@@ -264,8 +303,9 @@ export class CacheService {
     /**
      * Generate a summary of the cache refresh operation
      */
-    private generateSummary(result: CacheResult, usingCache: boolean = false): string {
+    private generateSummary(result: CacheResult, usingCache: boolean = false, duration?:number): string {
         const mode = usingCache ? '(Using cached working lines)' : '(Full scan 1-300)';
+        const durationStr = duration ? `⏱️ Duration: ${(duration / 1000).toFixed(2)}s` : '';
         const lines = [
             '\n' + '='.repeat(60),
             `${colors.bold}📊 CACHE REFRESH SUMMARY ${mode}${colors.reset}`,
@@ -277,6 +317,7 @@ export class CacheService {
             '',
             `📈 Success rate: ${((result.successCount / result.totalLines) * 100).toFixed(1)}%`,
             `🚀 Working lines saved for next refresh: ${result.successCount}`,
+            durationStr,
             '='.repeat(60)
         ];
 

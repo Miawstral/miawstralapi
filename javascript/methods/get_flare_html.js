@@ -7,7 +7,7 @@ require('colors');
  * @returns {Promise<string>} HTML of the page
  */
 async function getPageViaFlareSolverr(url) {
-    const apiUrl = 'http://0.0.0.0:8191/v1';
+    const apiUrl = 'http://127.0.0.1:8191/v1';
     const data = {
         cmd: 'request.get',
         url: url,

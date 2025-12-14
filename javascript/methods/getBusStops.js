@@ -26,7 +26,7 @@ async function getBusStops(bus_id) {
     // For URLs: use formatted ID for MISTRAL codes, original for ligne path
     let url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/${originalBusId}/direction/OUTWARD/MISTRAL:${formattedId}?islid=MISTRAL%3A${formattedId}&ismode=Bus&islsn=${originalBusId}&issubnet=Reseau%20Mistral&isdir=OUTWARD&w=true&date=`;
     if(bus_id.toString().toUpperCase() === "U") url = `https://sim.112.prod.instant-system.com/fr/horaires/Reseau-Mistral/Bus/ligne/U/direction/OUTWARD/MISTRAL:U`
-    const apiUrl = 'http://127.0.0.0:8191/v1';
+    const apiUrl = 'http://127.0.0.1:8191/v1';
     const data = {
         cmd: 'request.get',
         url: url,
