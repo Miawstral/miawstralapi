@@ -29,7 +29,6 @@ export interface BusStep {
     departureTime?: string;
     arrivalTime?: string;
     stopsCount: number;
-    duration: number,
 }
 
 export type RouteStep = WalkStep | BusStep;

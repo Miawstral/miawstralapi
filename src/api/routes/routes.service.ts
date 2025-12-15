@@ -200,8 +200,40 @@ export async function calculateRoutes(request: RouteRequest): Promise<RouteRespo
                         toStop.name, to.name
                     ));
                 }
-                const totalDuration = steps.reduce((sum, step) => sum + step.duration, 0)
+                const totalDuration = steps.reduce((sum, step) => {
+                    if (step.type === 'walk') {
+                        return sum + step.duration;
+                    } else {
+                        const distance = getDistance(step.from.lat, step.from.lon, step.to.lat, step.to.lon);
+                        return sum + ((distance / AVG_BUS_SPEED) * 60);
+                    }
+                }, 0);
+                const walkingDistance = steps
+                    .filter((s): s is WalkStep => s.type === 'walk')
+                    .reduce((sum, s) => sum + s.distance, 0);
+
+                const route: RouteOption = {
+                    duration: totalDuration,
+                    transfers: 0,
+                    walkingDistance,
+                    steps,
+                    score: 0
+                };
+                route.score = calculateScore(route);
+                routes.push(route);
             }
         }
     }
+
+    routes.sort((a, b) => a.score - b.score);
+    const calculationTime = Date.now() - startTime;
+
+    console.log(`[ROUTING] Found ${routes.length} routes in ${calculationTime}ms`);
+
+    return {
+        from,
+        to,
+        routes: routes.slice(0, 5),
+        calculationTime
+    };
 }
