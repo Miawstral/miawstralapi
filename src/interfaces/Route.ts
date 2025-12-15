@@ -1,7 +1,7 @@
 export interface Location {
     lat?: number;
     lon?: number;
-    stopId?: number;
+    stopId?: string;
 }
 
 export interface RouteRequest {

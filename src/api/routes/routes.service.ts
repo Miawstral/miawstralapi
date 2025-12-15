@@ -54,3 +54,44 @@ async function findNearbyStops(lat: number, lon: number, maxDistance: number): P
         return distA - distB;
     });
 }
+
+/**
+ * Resolve a location (based on coords or stopId)
+ */
+async function resolveLocation(location: Location): Promise<{ lat: number; lon: number; stopId?: string; name?: string}> {
+    if (location.stopId) {
+        const stop = await stopsService.getStopById(location.stopId);
+        return {
+            lat: parseFloat(stop.latitude!),
+            lon: parseFloat(stop.longitude!),
+            stopId: stop.stopPointId,
+            name: stop.name,
+        }
+    }
+
+    if (location.lat && location.lon) { 
+        return { lat: location.lat, lon: location.lon };
+    }
+    throw new Error('Location must have either lat/lon or stopId')
+}
+
+/**
+ * Check if 2 stops are on the same line.
+ */
+async function findDirectLines(fromStopId: string, toStopId: string): Promise<{ line: BusLine; fromIndex: number; toIndex: number}[]>{
+    const files = fs.readdirSync(dataDir).filter(file => file.endsWith('_horaires.json'));
+    const directLines: { line: BusLine; fromIndex: number; toIndex: number }[] = [];
+
+    for (const file of files){
+        const filePath = path.join(dataDir, file);
+        const line: BusLine = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+
+        const fromIndex = line.stops.findIndex(s => s.stopPointId === fromStopId);
+        const toIndex = line.stops.findIndex(s => s.stopPointId === toStopId);
+
+        if (fromIndex !== -1 && toIndex !== -1 && fromIndex < toIndex) {
+            directLines.push({ line, fromIndex, toIndex });
+        }
+    }
+    return directLines;
+}
