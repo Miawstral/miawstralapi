@@ -95,3 +95,66 @@ async function findDirectLines(fromStopId: string, toStopId: string): Promise<{ 
     }
     return directLines;
 }
+
+
+/**
+ * Creating a walkstep
+ */
+
+function createWalkStep(
+    fromLat: number,
+    fromLon: number,
+    toLat: number,
+    toLon: number,
+    fromName?: string,
+    toName?: string,
+    toStopId?: string
+): WalkStep {
+    const distance = getDistance(fromLat, fromLon, toLat, toLon) * 1000;
+    const duration = (distance / 1000) / WALKING_SPEED * 60;
+
+    return {
+        type: 'walk',
+        from: { lat: fromLat, lon: fromLon, name: fromName },
+        to: { lat: toLat, lon: toLon, name: toName },
+        duration: Math.ceil(duration),
+        distance: Math.round(distance)
+    };
+}
+
+/**
+ * Creating a busStep
+ */
+
+function createBusStep(line: BusLine, fromIndex: number, toIndex: number): BusStep {
+    const fromStop = line.stops[fromIndex];
+    const toStop = line.stops[toIndex];
+    const stopsCount = toIndex - fromIndex;
+
+    return {
+        type: 'bus',
+        line: line.bus_id,
+        lineName: line.lineName || line.bus_id,
+        from: {
+            stopId: fromStop.stopPointId!,
+            name: fromStop.name,
+            lat: parseFloat(fromStop.latitude!),
+            lon: parseFloat(fromStop.longitude!)
+        },
+        to: {
+            stopId: toStop.stopPointId!,
+            name: toStop.name,
+            lat: parseFloat(toStop.latitude!),
+            lon: parseFloat(toStop.longitude!)
+        },
+        departureTime: fromStop.times[0],
+        stopsCount
+    };
+}
+
+/**
+ * Calculate a score for the route
+ */
+function calculateScore(route: RouteOption): number {
+    return route.duration + (route.transfers * TRANSFER_PENALTY) + (route.walkingDistance / 100);
+}
