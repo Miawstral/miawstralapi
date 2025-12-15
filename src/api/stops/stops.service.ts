@@ -4,18 +4,22 @@ import path from 'path';
 import { BusLine, StopDetails, Stop } from '../../interfaces/BusData';
 
 let allStopsCache: Partial<Stop>[] | null = null;
+let cacheTimestamp: number | null = null;
+const CACHE_TTL: number = 10 * 60 * 1000;
 const dataDir = path.join(__dirname, '../../data');
 
 /**
  * Creates a summary of all unique stops from all data files.
  */
 export const getAllStops = async (): Promise<Partial<Stop>[]> => {
-    if (allStopsCache) {
-        console.log('[CACHE] Returning all stops from the cache.')
-        return allStopsCache
+    const now = Date.now();
+
+    if (allStopsCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_TTL){
+        console.log('[CACHE] Returning all stops from cache.')
+        return allStopsCache;
     }
     
-    console.log(`[FILESYS] Reading all stops from files for the first time.`)
+    console.log('[FILESYS] - Reading all stops from files.');
     const files = fs.readdirSync(dataDir).filter(file => file.endsWith('_horaires.json'));
     const uniqueStops = new Map<string, Partial<Stop>>();
 
@@ -31,17 +35,25 @@ export const getAllStops = async (): Promise<Partial<Stop>[]> => {
                     name: stop.name,
                     city: stop.city,
                     latitude: stop.latitude,
-                    longitude: stop.longitude,
+                    longitude: stop.longitude
                 });
             }
         }
     }
-    
-    
-    allStopsCache = Array.from(uniqueStops.values()); 
-    return allStopsCache
-    
+
+    allStopsCache = Array.from(uniqueStops.values());
+    cacheTimestamp = now;
+    return allStopsCache;
 };
+
+/**
+ * Invalidate cache manually to avoid having wrong data and force refreshing cache.
+ */
+export const invalidateCache = (): void => {
+    allStopsCache = null;
+    cacheTimestamp = null;
+    console.log('[CACHE] Cache invalidated.')
+}
 
 
 
