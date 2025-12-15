@@ -158,3 +158,50 @@ function createBusStep(line: BusLine, fromIndex: number, toIndex: number): BusSt
 function calculateScore(route: RouteOption): number {
     return route.duration + (route.transfers * TRANSFER_PENALTY) + (route.walkingDistance / 100);
 }
+
+/**
+ * Calculate routes from A to B
+ */
+export async function calculateRoutes(request: RouteRequest): Promise<RouteResponse> {
+    const startTime = Date.now();
+    const maxWalking = request.maxWalkingDistance || 500;
+    const maxTransfers = request.maxTransfers || 2;
+
+    const from = await resolveLocation(request.from);
+    const to = await resolveLocation(request.to);
+    
+    console.log(`[ROUTING] Calculating routes from (${from.lat}, ${from.lon}) to (${to.lat}, ${to.lon})`);
+
+    const routes: RouteOption[] = [];
+    const fromStops = await findNearbyStops(from.lat, from.lon, maxWalking);
+    const toStops = await findNearbyStops(to.lat, to.lon, maxWalking);
+
+    console.log(`[ROUTING] Found ${fromStops.length} departure stops and ${toStops.length} arrival stops`);
+    for (const fromStop of fromStops.slice(0, 5)) {
+        for (const toStop of toStops.slice(0, 5)) {
+            const directLines = await findDirectLines(fromStop.stopPointId!, toStop.stopPointId!);
+
+            for (const { line, fromIndex, toIndex } of directLines ){
+                const steps: RouteStep[] = [];
+
+                if (!from.stopId) {
+                    steps.push(createWalkStep(
+                        from.lat, from.lon,
+                        parseFloat(fromStop.latitude!), parseFloat(fromStop.longitude!),
+                        from.name, fromStop.name, fromStop.stopPointId!
+                    ));
+                }
+                steps.push(createBusStep(line, fromIndex, toIndex));
+
+                if (!to.stopId) {
+                    steps.push(createWalkStep(
+                        parseFloat(toStop.latitude!), parseFloat(toStop.longitude!),
+                        to.lat, to.lon,
+                        toStop.name, to.name
+                    ));
+                }
+                const totalDuration = steps.reduce((sum, step) => sum + step.duration, 0)
+            }
+        }
+    }
+}
