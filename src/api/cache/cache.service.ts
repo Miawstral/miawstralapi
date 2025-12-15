@@ -231,6 +231,16 @@ export class CacheService {
         const duration = Date.now() - startTime;
         result.summary = this.generateSummary(result, usingCache, duration);
         console.log(result.summary);
+
+        try {
+            const { invalidateCache: invalidateStopsCache } = await import('../stops/stops.service')
+            const { invalidateCache: invalidateLinesCache } = await import('../lines/lines.service')
+            invalidateLinesCache();
+            invalidateStopsCache();
+            this.log('[CACHE] Invalidated stops and lines caches', 'green');
+        } catch (error) {
+            this.log('[WARNING] Failed to invalidate caches', 'yellow');
+        }
         return result
     }
 

@@ -26,7 +26,6 @@ export const getById = async (req: Request, res: Response, next: NextFunction) =
 export const search = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = req.query.q; 
-    console.log(query)
   
     if (!query || typeof query !== 'string') {
       return res.status(400).json({

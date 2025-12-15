@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { BusLine } from '../../interfaces/BusData';
-import { getAll } from './lines.controller';
+
 
 
 const dataDir = path.join(__dirname, '../../data');
@@ -54,6 +54,9 @@ export const invalidateCache = (): void => {
  * Reads a specific bus line file by its ID.
  */
 export const getLineById = async (id: string): Promise<BusLine> => {
+  if (!/^[a-zA-Z0-9]+$/.test(id)){
+    throw new Error('Invalid line ID format.');
+  }
   const filePath = path.join(dataDir, `${id}_horaires.json`);
 
   if (!fs.existsSync(filePath)) {

@@ -1,0 +1,503 @@
+{
+  "bus_id": "101",
+  "lineName": "Planquette - Gare Routière (Toulon)",
+  "direction": "OUTWARD",
+  "lineId": "MISTRAL:0101",
+  "stops": [
+    {
+      "name": "Planquette",
+      "city": "La Garde",
+      "latitude": "43.13241",
+      "longitude": "6.0174",
+      "stopPointId": "MISTRAL:GAPLAN",
+      "accessible": true,
+      "times": [
+        "6:00",
+        "7:18",
+        "8:52",
+        "10:25",
+        "12:10",
+        "13:35",
+        "15:25",
+        "17:00",
+        "18:30"
+      ]
+    },
+    {
+      "name": "Hôp. Clémenceau",
+      "city": "La Garde",
+      "latitude": "43.13182",
+      "longitude": "6.01591",
+      "stopPointId": "MISTRAL:GAHOPO",
+      "accessible": true,
+      "times": [
+        "6:01",
+        "7:19",
+        "8:53",
+        "10:26",
+        "12:11",
+        "13:36",
+        "15:26",
+        "17:01",
+        "18:31"
+      ]
+    },
+    {
+      "name": "Tristan",
+      "city": "La Garde",
+      "latitude": "43.12963",
+      "longitude": "6.01566",
+      "stopPointId": "MISTRAL:GATRIN",
+      "accessible": true,
+      "times": [
+        "6:02",
+        "7:20",
+        "8:54",
+        "10:27",
+        "12:12",
+        "13:37",
+        "15:27",
+        "17:03",
+        "18:33"
+      ]
+    },
+    {
+      "name": "Jardin Veyret",
+      "city": "La Garde",
+      "latitude": "43.12856",
+      "longitude": "6.01393",
+      "stopPointId": "MISTRAL:GAJAVO",
+      "accessible": true,
+      "times": [
+        "6:03",
+        "7:21",
+        "8:55",
+        "10:28",
+        "12:13",
+        "13:38",
+        "15:28",
+        "17:04",
+        "18:34"
+      ]
+    },
+    {
+      "name": "Rocher (La Garde)",
+      "city": "La Garde",
+      "latitude": "43.12717",
+      "longitude": "6.01333",
+      "stopPointId": "MISTRAL:GAROCO",
+      "accessible": true,
+      "times": [
+        "6:04",
+        "7:22",
+        "8:56",
+        "10:29",
+        "12:14",
+        "13:39",
+        "15:29",
+        "17:05",
+        "18:35"
+      ]
+    },
+    {
+      "name": "Garde Centre",
+      "city": "La Garde",
+      "latitude": "43.12495",
+      "longitude": "6.01006",
+      "stopPointId": "MISTRAL:GAGACN",
+      "accessible": true,
+      "times": [
+        "6:04",
+        "7:23",
+        "8:57",
+        "10:30",
+        "12:15",
+        "13:40",
+        "15:30",
+        "17:06",
+        "18:36"
+      ]
+    },
+    {
+      "name": "Marc Delage",
+      "city": "La Garde",
+      "latitude": "43.12491",
+      "longitude": "6.00842",
+      "stopPointId": "MISTRAL:GAMDEN",
+      "accessible": true,
+      "times": [
+        "6:05",
+        "7:23",
+        "8:57",
+        "10:30",
+        "12:15",
+        "13:40",
+        "15:30",
+        "17:06",
+        "18:36"
+      ]
+    },
+    {
+      "name": "Delage",
+      "city": "La Garde",
+      "latitude": "43.12507",
+      "longitude": "6.0054",
+      "stopPointId": "MISTRAL:GADELN",
+      "accessible": true,
+      "times": [
+        "6:05",
+        "7:24",
+        "8:58",
+        "10:31",
+        "12:16",
+        "13:41",
+        "15:31",
+        "17:07",
+        "18:37"
+      ]
+    },
+    {
+      "name": "Allée Télémaque",
+      "city": "La Garde",
+      "latitude": "43.12463",
+      "longitude": "6.0027",
+      "stopPointId": "MISTRAL:GATELN",
+      "accessible": true,
+      "times": [
+        "6:06",
+        "7:25",
+        "8:59",
+        "10:32",
+        "12:17",
+        "13:42",
+        "15:32",
+        "17:08",
+        "18:38"
+      ]
+    },
+    {
+      "name": "Louis Masson",
+      "city": "La Garde",
+      "latitude": "43.12399",
+      "longitude": "6.00001",
+      "stopPointId": "MISTRAL:GALMAN",
+      "accessible": true,
+      "times": [
+        "6:06",
+        "7:26",
+        "9:00",
+        "10:32",
+        "12:17",
+        "13:42",
+        "15:32",
+        "17:09",
+        "18:39"
+      ]
+    },
+    {
+      "name": "Reblançon",
+      "city": "La Garde",
+      "latitude": "43.1228",
+      "longitude": "5.99639",
+      "stopPointId": "MISTRAL:GAREBN",
+      "accessible": true,
+      "times": [
+        "6:07",
+        "7:27",
+        "9:01",
+        "10:33",
+        "12:18",
+        "13:43",
+        "15:33",
+        "17:10",
+        "18:40"
+      ]
+    },
+    {
+      "name": "Pierre Gaillard",
+      "city": "La Garde",
+      "latitude": "43.12245",
+      "longitude": "5.99192",
+      "stopPointId": "MISTRAL:GAGAIN",
+      "accessible": true,
+      "times": [
+        "6:08",
+        "7:28",
+        "9:02",
+        "10:34",
+        "12:19",
+        "13:44",
+        "15:34",
+        "17:11",
+        "18:41"
+      ]
+    },
+    {
+      "name": "Ch. Ste Musse",
+      "city": "La Garde",
+      "latitude": "43.12274",
+      "longitude": "5.98537",
+      "stopPointId": "MISTRAL:GACHMN",
+      "accessible": true,
+      "times": [
+        "6:09",
+        "7:30",
+        "9:04",
+        "10:36",
+        "12:21",
+        "13:46",
+        "15:36",
+        "17:13",
+        "18:43"
+      ]
+    },
+    {
+      "name": "Maison des services",
+      "city": "Toulon",
+      "latitude": "43.12253",
+      "longitude": "5.9811",
+      "stopPointId": "MISTRAL:TOMSEN",
+      "accessible": true,
+      "times": [
+        "6:10",
+        "7:31",
+        "9:05",
+        "10:37",
+        "12:22",
+        "13:47",
+        "15:37",
+        "17:14",
+        "18:44"
+      ]
+    },
+    {
+      "name": "Font Pré",
+      "city": "Toulon",
+      "latitude": "43.12602",
+      "longitude": "5.97024",
+      "stopPointId": "MISTRAL:TOFOPN",
+      "accessible": true,
+      "times": [
+        "6:12",
+        "7:34",
+        "9:08",
+        "10:40",
+        "12:25",
+        "13:50",
+        "15:40",
+        "17:17",
+        "18:47"
+      ]
+    },
+    {
+      "name": "R.Garros",
+      "city": "Toulon",
+      "latitude": "43.12764",
+      "longitude": "5.9687",
+      "stopPointId": "MISTRAL:TORGAE",
+      "accessible": true,
+      "times": [
+        "6:12",
+        "7:35",
+        "9:09",
+        "10:40",
+        "12:25",
+        "13:50",
+        "15:40",
+        "17:18",
+        "18:48"
+      ]
+    },
+    {
+      "name": "Brunet",
+      "city": "Toulon",
+      "latitude": "43.12859",
+      "longitude": "5.96575",
+      "stopPointId": "MISTRAL:TOBRUN",
+      "accessible": true,
+      "times": [
+        "6:13",
+        "7:36",
+        "9:10",
+        "10:41",
+        "12:26",
+        "13:51",
+        "15:41",
+        "17:19",
+        "18:49"
+      ]
+    },
+    {
+      "name": "Ecoles (Brunet)",
+      "city": "Toulon",
+      "latitude": "43.12728",
+      "longitude": "5.96218",
+      "stopPointId": "MISTRAL:TOECBN",
+      "accessible": true,
+      "times": [
+        "6:14",
+        "7:37",
+        "9:12",
+        "10:42",
+        "12:27",
+        "13:52",
+        "15:42",
+        "17:21",
+        "18:50"
+      ]
+    },
+    {
+      "name": "Providence",
+      "city": "Toulon",
+      "latitude": "43.12639",
+      "longitude": "5.95992",
+      "stopPointId": "MISTRAL:TOPVIN",
+      "accessible": true,
+      "times": [
+        "6:14",
+        "7:38",
+        "9:13",
+        "10:43",
+        "12:28",
+        "13:53",
+        "15:43",
+        "17:22",
+        "18:51"
+      ]
+    },
+    {
+      "name": "Pont St Jean",
+      "city": "Toulon",
+      "latitude": "43.12442",
+      "longitude": "5.9552",
+      "stopPointId": "MISTRAL:TOPSJN",
+      "accessible": true,
+      "times": [
+        "6:16",
+        "7:40",
+        "9:15",
+        "10:45",
+        "12:30",
+        "13:55",
+        "15:45",
+        "17:24",
+        "18:53"
+      ]
+    },
+    {
+      "name": "Eglise",
+      "city": "Toulon",
+      "latitude": "43.12398",
+      "longitude": "5.95375",
+      "stopPointId": "MISTRAL:TOEGLN",
+      "accessible": true,
+      "times": [
+        "6:16",
+        "7:41",
+        "9:16",
+        "10:46",
+        "12:31",
+        "13:56",
+        "15:45",
+        "17:25",
+        "18:54"
+      ]
+    },
+    {
+      "name": "Régimbaud",
+      "city": "Toulon",
+      "latitude": "43.12379",
+      "longitude": "5.95108",
+      "stopPointId": "MISTRAL:TOREGN",
+      "accessible": true,
+      "times": [
+        "6:17",
+        "7:42",
+        "9:17",
+        "10:47",
+        "12:32",
+        "13:57",
+        "15:46",
+        "17:26",
+        "18:55"
+      ]
+    },
+    {
+      "name": "Mermoz",
+      "city": "Toulon",
+      "latitude": "43.12333",
+      "longitude": "5.94742",
+      "stopPointId": "MISTRAL:TOMERN",
+      "accessible": true,
+      "times": [
+        "6:18",
+        "7:43",
+        "9:18",
+        "10:48",
+        "12:33",
+        "13:58",
+        "15:47",
+        "17:28",
+        "18:57"
+      ]
+    },
+    {
+      "name": "Dunant",
+      "city": "Toulon",
+      "latitude": "43.12454",
+      "longitude": "5.94634",
+      "stopPointId": "MISTRAL:TODUNE",
+      "accessible": true,
+      "times": [
+        "6:19",
+        "7:44",
+        "9:19",
+        "10:49",
+        "12:34",
+        "13:59",
+        "15:48",
+        "17:29",
+        "18:58"
+      ]
+    },
+    {
+      "name": "Loubière",
+      "city": "Toulon",
+      "latitude": "43.12517",
+      "longitude": "5.94116",
+      "stopPointId": "MISTRAL:TOLOBN",
+      "accessible": true,
+      "times": [
+        "6:21",
+        "7:47",
+        "9:21",
+        "10:51",
+        "12:36",
+        "14:01",
+        "15:50",
+        "17:32",
+        "19:01"
+      ]
+    },
+    {
+      "name": "Gare Routière (Toulon)",
+      "city": "Toulon",
+      "latitude": "43.1276",
+      "longitude": "5.93122",
+      "stopPointId": "MISTRAL:TOGR06",
+      "accessible": true,
+      "times": [
+        "6:25",
+        "7:52",
+        "9:26",
+        "10:55",
+        "12:40",
+        "14:05",
+        "15:54",
+        "17:37",
+        "19:05"
+      ]
+    }
+  ],
+  "notes": []
+}
