@@ -5,49 +5,69 @@ const API_URL = 'http://localhost:3000';
 
 /**
  * Test de routing sur la ligne 87
- * De "Mouton" vers "Lycée Beaussier"
+ * De "Langevin" vers "Lycée Beaussier"
  */
 async function testRouting() {
-    console.log('🚀 Testing routing API...\n'.cyan.bold);
+    console.log('🚀 Testing routing API - Line 87 test...\n'.cyan.bold);
 
-    // Coordonnées des arrêts (depuis 87_horaires.json)
-    const mouton = {
-        stopId: 'MISTRAL:SIMOUN',
-        name: 'Mouton',
-        lat: 43.08843,
-        lon: 5.85291
+    // Test sur la ligne 87 : Seyne Centre → Lycée Beaussier
+    const seyneCentre = {
+        stopId: 'MISTRAL:SECENN',
+        name: 'Seyne Centre (ligne 87)',
+        lat: 43.10121,
+        lon: 5.8834
     };
 
-    const lyceeBaaussier = {
+    const lyceeBeaussier = {
         stopId: 'MISTRAL:SELBEO',
-        name: 'Lycée Beaussier',
+        name: 'Lycée Beaussier (ligne 87)',
         lat: 43.09914,
         lon: 5.87973
     };
 
-    console.log(`📍 From: ${mouton.name} (${mouton.lat}, ${mouton.lon})`.blue);
-    console.log(`📍 To: ${lyceeBaaussier.name} (${lyceeBaaussier.lat}, ${lyceeBaaussier.lon})\n`.blue);
+    // Point de destination proche mais pas exactement sur l'arrêt (pour forcer la marche finale)
+    const destinationProche = {
+        lat: 43.09950,  // ~40m au nord de l'arrêt
+        lon: 5.88000    // ~20m à l'est de l'arrêt
+    };
+
+    console.log(`📍 From: ${seyneCentre.name} (${seyneCentre.lat}, ${seyneCentre.lon})`.blue);
+    console.log(`📍 To: ${lyceeBeaussier.name} (${lyceeBeaussier.lat}, ${lyceeBeaussier.lon})`.blue);
+    console.log(`📍 Final destination: (${destinationProche.lat}, ${destinationProche.lon}) - Requires walking\n`.blue);
 
     try {
-        // Test 1: Avec stopId
-        console.log('🧪 Test 1: Using stopId'.yellow);
+        // Test 1: Avec stopId (pas de marche finale)
+        console.log('🧪 Test 1: Direct bus stop to bus stop (no final walk)'.yellow);
         const response1 = await axios.post(`${API_URL}/api/routes/calculate`, {
-            from: { stopId: mouton.stopId },
-            to: { stopId: lyceeBaaussier.stopId },
-            maxWalkingDistance: 500
+            from: { stopId: seyneCentre.stopId },
+            to: { stopId: lyceeBeaussier.stopId },
+            maxWalkingDistance: 800,
+            maxTransfers: 2
         });
 
         displayResult(response1.data);
 
-        // Test 2: Avec coordonnées GPS
-        console.log('\n🧪 Test 2: Using GPS coordinates'.yellow);
+        // Test 2: Vers un point proche (marche finale requise)
+        console.log('\n🧪 Test 2: Bus stop to nearby GPS point (requires final walk)'.yellow);
         const response2 = await axios.post(`${API_URL}/api/routes/calculate`, {
-            from: { lat: mouton.lat, lon: mouton.lon },
-            to: { lat: lyceeBaaussier.lat, lon: lyceeBaaussier.lon },
-            maxWalkingDistance: 500
+            from: { stopId: seyneCentre.stopId },
+            to: { lat: destinationProche.lat, lon: destinationProche.lon },
+            maxWalkingDistance: 800,
+            maxTransfers: 2
         });
 
         displayResult(response2.data);
+
+        // Test 3: Depuis et vers des coordonnées GPS
+        console.log('\n🧪 Test 3: GPS to GPS (requires both initial and final walk)'.yellow);
+        const response3 = await axios.post(`${API_URL}/api/routes/calculate`, {
+            from: { lat: seyneCentre.lat, lon: seyneCentre.lon },
+            to: { lat: destinationProche.lat, lon: destinationProche.lon },
+            maxWalkingDistance: 800,
+            maxTransfers: 2
+        });
+
+        displayResult(response3.data);
 
         console.log('\n✅ All tests passed!'.green.bold);
 

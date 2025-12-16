@@ -5,6 +5,7 @@ import lineRouter from './api/lines/lines.routes';
 import stopsRouter from './api/stops/stops.routes';
 import cacheRouter from './api/cache/cache.routes';
 import routesRouter from './api/routes/routes.routes';
+import mapRouter from './pages/map/map'
 // pages 
 import mainPage from './pages/main';
 const app: Application = express();
@@ -19,7 +20,7 @@ app.use('/api/lines', lineRouter);
 app.use('/api/stops', stopsRouter);
 app.use('/api/routes', routesRouter);
 app.use('/refresh', cacheRouter);
-app.use('/', mainPage);
+app.use('/', mapRouter);
 
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miawstral - Calculateur d'itinéraire</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #f5f5f5;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 400px;
+            background: white;
+            padding: 1.5rem;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        #map {
+            flex: 1;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .routes-container {
+            margin-top: 1.5rem;
+        }
+
+        .route-card {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .route-card:hover {
+            background: #fff;
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .route-card.selected {
+            border-color: #667eea;
+            background: #fff;
+        }
+
+        .route-summary {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .route-summary span {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .route-steps {
+            margin-top: 0.5rem;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-icon {
+            font-size: 1.5rem;
+        }
+
+        .step-details {
+            flex: 1;
+        }
+
+        .step-details .name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .step-details .info {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #667eea;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚌 Miawstral - Calculateur d'itinéraire</h1>
+    </header>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="input-group">
+                <label>🔵 Départ (latitude, longitude)</label>
+                <input type="text" id="from" placeholder="Ex: 43.296482, 5.369780">
+            </div>
+
+            <div class="input-group">
+                <label>🔴 Arrivée (latitude, longitude)</label>
+                <input type="text" id="to" placeholder="Ex: 43.301234, 5.380456">
+            </div>
+
+            <div class="input-group">
+                <label>🚶 Distance max de marche (mètres)</label>
+                <input type="number" id="maxWalking" value="500" min="100" max="2000" step="50">
+            </div>
+
+            <button class="btn" id="searchBtn">🔍 Calculer l'itinéraire</button>
+
+            <div id="message"></div>
+
+            <div class="routes-container" id="routesContainer"></div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Initialiser la carte centrée sur Marseille
+        const map = L.map('map').setView([43.296482, 5.369780], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let fromMarker = null;
+        let toMarker = null;
+        let routeLayers = [];
+        let currentRoutes = [];
+
+        // Icônes personnalisées
+        const fromIcon = L.icon({
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iNDUiIHZpZXdCb3g9IjAgMCAzMCA0NSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTUgMEMxMC4wMjkgMCA2IDQuMDI5IDYgOWMwIDcuNSA5IDE2IDkgMTZzOS04LjUgOS0xNmMwLTQuOTcxLTQuMDI5LTktOS05eiIgZmlsbD0iIzRBOTBFMiIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iOSIgcj0iNCIgZmlsbD0id2hpdGUiLz48L3N2Zz4=',
+            iconSize: [30, 45],
+            iconAnchor: [15, 45]
+        });
+
+        const toIcon = L.icon({
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iNDUiIHZpZXdCb3g9IjAgMCAzMCA0NSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTUgMEMxMC4wMjkgMCA2IDQuMDI5IDYgOWMwIDcuNSA5IDE2IDkgMTZzOS04LjUgOS0xNmMwLTQuOTcxLTQuMDI5LTktOS05eiIgZmlsbD0iI0UyNEE0QSIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iOSIgcj0iNCIgZmlsbD0id2hpdGUiLz48L3N2Zz4=',
+            iconSize: [30, 45],
+            iconAnchor: [15, 45]
+        });
+
+        // Click sur la carte pour définir départ/arrivée
+        let nextPoint = 'from';
+        map.on('click', function(e) {
+            const { lat, lng } = e.latlng;
+            
+            if (nextPoint === 'from') {
+                document.getElementById('from').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                if (fromMarker) map.removeLayer(fromMarker);
+                fromMarker = L.marker([lat, lng], { icon: fromIcon }).addTo(map);
+                nextPoint = 'to';
+            } else {
+                document.getElementById('to').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                if (toMarker) map.removeLayer(toMarker);
+                toMarker = L.marker([lat, lng], { icon: toIcon }).addTo(map);
+                nextPoint = 'from';
+            }
+        });
+
+        // Recherche d'itinéraire
+        document.getElementById('searchBtn').addEventListener('click', async () => {
+            const fromValue = document.getElementById('from').value.trim();
+            const toValue = document.getElementById('to').value.trim();
+            const maxWalking = parseInt(document.getElementById('maxWalking').value);
+
+            if (!fromValue || !toValue) {
+                showMessage('Veuillez renseigner le départ et l\'arrivée', 'error');
+                return;
+            }
+
+            const [fromLat, fromLon] = fromValue.split(',').map(v => parseFloat(v.trim()));
+            const [toLat, toLon] = toValue.split(',').map(v => parseFloat(v.trim()));
+
+            if (isNaN(fromLat) || isNaN(fromLon) || isNaN(toLat) || isNaN(toLon)) {
+                showMessage('Coordonnées invalides', 'error');
+                return;
+            }
+
+            showMessage('Calcul en cours...', 'loading');
+            document.getElementById('searchBtn').disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:3000/api/routes/calculate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from: { lat: fromLat, lon: fromLon },
+                        to: { lat: toLat, lon: toLon },
+                        maxWalkingDistance: maxWalking
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.data.routes.length > 0) {
+                    currentRoutes = data.data.routes;
+                    displayRoutes(data.data.routes);
+                    showMessage(`${data.data.routes.length} itinéraire(s) trouvé(s) en ${data.data.calculationTime}ms`, 'success');
+                } else {
+                    showMessage('Aucun itinéraire trouvé', 'error');
+                    document.getElementById('routesContainer').innerHTML = '';
+                }
+            } catch (error) {
+                showMessage('Erreur: ' + error.message, 'error');
+            } finally {
+                document.getElementById('searchBtn').disabled = false;
+            }
+        });
+
+        function displayRoutes(routes) {
+            const container = document.getElementById('routesContainer');
+            container.innerHTML = '';
+
+            routes.forEach((route, index) => {
+                const card = document.createElement('div');
+                card.className = 'route-card';
+                
+                const duration = Math.ceil(route.duration);
+                const walking = route.walkingDistance;
+                
+                card.innerHTML = `
+                    <div class="route-summary">
+                        <span>Itinéraire ${index + 1}</span>
+                        <span>${duration} min</span>
+                    </div>
+                    <div style="font-size: 0.9rem; color: #666;">
+                        🚶 ${walking}m de marche • 🔄 ${route.transfers} correspondance(s)
+                    </div>
+                    <div class="route-steps">
+                        ${route.steps.map(step => {
+                            if (step.type === 'walk') {
+                                return `
+                                    <div class="step">
+                                        <div class="step-icon">🚶</div>
+                                        <div class="step-details">
+                                            <div class="name">Marche</div>
+                                            <div class="info">${step.distance}m • ${step.duration} min</div>
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                return `
+                                    <div class="step">
+                                        <div class="step-icon">🚌</div>
+                                        <div class="step-details">
+                                            <div class="name">Bus ${step.line} - ${step.lineName}</div>
+                                            <div class="info">${step.from.name} → ${step.to.name} (${step.stopsCount} arrêts)</div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                        }).join('')}
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    document.querySelectorAll('.route-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    displayRouteOnMap(route);
+                });
+
+                container.appendChild(card);
+            });
+
+            // Afficher le premier itinéraire automatiquement
+            if (routes.length > 0) {
+                container.firstChild.classList.add('selected');
+                displayRouteOnMap(routes[0]);
+            }
+        }
+
+function displayRouteOnMap(route) {
+    // Supprimer les anciennes routes
+    routeLayers.forEach(layer => map.removeLayer(layer));
+    routeLayers = [];
+
+    const colors = {
+        walk: '#4A90E2',
+        bus: '#E74C3C'
+    };
+
+    route.steps.forEach((step, index) => {
+        const color = colors[step.type];
+        
+        // ✅ Utiliser la géométrie si disponible
+        let coords;
+        if (step.geometry && step.geometry.length > 0) {
+            coords = step.geometry; // Tracé réel depuis OSRM
+        } else {
+            // Fallback : ligne droite
+            coords = [
+                [step.from.lat, step.from.lon],
+                [step.to.lat, step.to.lon]
+            ];
+        }
+
+        const line = L.polyline(coords, {
+            color: color,
+            weight: step.type === 'bus' ? 6 : 4,
+            opacity: 0.8,
+            dashArray: step.type === 'walk' ? '5, 10' : null // ✅ Pointillés pour la marche
+        }).addTo(map);
+
+        // ✅ Animation au survol
+        line.on('mouseover', function() {
+            this.setStyle({ weight: this.options.weight + 2, opacity: 1 });
+        });
+        line.on('mouseout', function() {
+            this.setStyle({ weight: this.options.weight - 2, opacity: 0.8 });
+        });
+
+        const popupContent = step.type === 'walk' 
+            ? `🚶 Marche: ${step.distance}m (${step.duration} min)`
+            : `🚌 Bus ${step.line}: ${step.from.name} → ${step.to.name}`;
+        
+        line.bindPopup(popupContent);
+
+        routeLayers.push(line);
+
+        // Ajouter des marqueurs pour les arrêts de bus
+        if (step.type === 'bus') {
+            const startMarker = L.circleMarker([step.from.lat, step.from.lon], {
+                radius: 8,
+                fillColor: '#fff',
+                color: color,
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(map).bindPopup(`<b>${step.from.name}</b><br>🚌 Bus ${step.line}<br>⏰ ${step.departureTime || 'N/A'}`);
+
+            const endMarker = L.circleMarker([step.to.lat, step.to.lon], {
+                radius: 8,
+                fillColor: '#fff',
+                color: color,
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(map).bindPopup(`<b>${step.to.name}</b><br>🚌 Bus ${step.line}`);
+
+            routeLayers.push(startMarker, endMarker);
+        }
+    });
+
+    // Ajuster la vue
+    const allCoords = route.steps.flatMap(step => 
+        step.geometry || [[step.from.lat, step.from.lon], [step.to.lat, step.to.lon]]
+    );
+    const bounds = L.latLngBounds(allCoords);
+    map.fitBounds(bounds, { padding: [50, 50] });
+}
+
+        function showMessage(text, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.className = type;
+            msgDiv.textContent = text;
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => msgDiv.textContent = '', 5000);
+            }
+        }
+    </script>
+</body>
+</html>

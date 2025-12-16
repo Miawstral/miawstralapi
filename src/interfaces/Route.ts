@@ -18,6 +18,7 @@ export interface WalkStep {
     to: { lat: number; lon: number; name?: string, stopId?: string };
     duration: number;
     distance: number;
+    geometry?: [number, number][];
 }
 
 export interface BusStep {
@@ -29,6 +30,9 @@ export interface BusStep {
     departureTime?: string;
     arrivalTime?: string;
     stopsCount: number;
+    duration: number;  
+    distance: number;  
+    geometry?: [number, number][];
 }
 
 export type RouteStep = WalkStep | BusStep;
