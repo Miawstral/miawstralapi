@@ -4,12 +4,54 @@ import { Stop, BusLine } from '../../interfaces/BusData';
 import { RouteRequest, RouteOption, RouteStep, RouteResponse, BusStep, WalkStep, Location } from '../../interfaces/Route';
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 
 const dataDir = path.join(__dirname, '../../data');
 
 const WALKING_SPEED = 5;
-const AVG_BUS_SPEED = 30;
+const AVG_BUS_SPEED = 20;
 const TRANSFER_PENALTY = 5;
+const URBAN_FACTOR = 1.4;
+const USE_OSRM = process.env.USE_OSRM || 'true'; 
+const OSRM_URL = process.env.OSRM_URL || 'https://osrm.1sheol.xyz';
+
+
+/**
+ * Calculation of real distance from OSRM
+ */
+
+async function getRealWalkingDistance(
+    fromLat: number,
+    fromLon: number,
+    toLat: number,
+    toLon: number
+): Promise<{ distance: number; duration: number }> {
+    if (USE_OSRM) {
+        try {
+            const url = `${OSRM_URL}/route/v1/foot/${fromLon},${fromLat};${toLon},${toLat}?overview=false`;
+            const response = await axios.get(url, { timeout: 2000 });
+
+            if (response.data.code === 'Ok') {
+                const route = response.data.routes[0];
+                const distance = Math.round(route.distance);
+                const duration = Math.ceil(route.duration / 60);
+
+                console.log(`[OSRM] Real: ${distance}m (${duration}min) vs Straight: ${Math.round(getDistance(fromLat, fromLon, toLat, toLon))}`);
+
+                return { distance, duration };
+            }
+        } catch (error) {
+            console.log('[ROUTING] OSRM Failed, using urban factor fallback');
+        }
+    }
+
+    const straightDistance = getDistance(fromLat, fromLon, toLat, toLon)  * 1000;
+    const realDistance = straightDistance * URBAN_FACTOR;
+    return {
+        distance: Math.round(realDistance),
+        duration: Math.ceil((realDistance / 1000) / WALKING_SPEED * 60),
+    }
+}
 
 /**
  * Calculate distance between 2 points (Haversine algorithm)
@@ -78,21 +120,47 @@ async function resolveLocation(location: Location): Promise<{ lat: number; lon: 
 /**
  * Check if 2 stops are on the same line.
  */
-async function findDirectLines(fromStopId: string, toStopId: string): Promise<{ line: BusLine; fromIndex: number; toIndex: number}[]>{
+/**
+ * Vérifier si 2 arrêts sont sur la même ligne (dans les 2 sens)
+ */
+async function findDirectLines(fromStopId: string, toStopId: string): Promise<{ line: BusLine; fromIndex: number; toIndex: number }[]> {
     const files = fs.readdirSync(dataDir).filter(file => file.endsWith('_horaires.json'));
     const directLines: { line: BusLine; fromIndex: number; toIndex: number }[] = [];
 
-    for (const file of files){
+    for (const file of files) {
         const filePath = path.join(dataDir, file);
         const line: BusLine = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
         const fromIndex = line.stops.findIndex(s => s.stopPointId === fromStopId);
         const toIndex = line.stops.findIndex(s => s.stopPointId === toStopId);
 
-        if (fromIndex !== -1 && toIndex !== -1 && fromIndex < toIndex) {
-            directLines.push({ line, fromIndex, toIndex });
+        if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
+            // Sens normal (OUTWARD)
+            if (fromIndex < toIndex) {
+                directLines.push({ line, fromIndex, toIndex });
+            }
+            else if (fromIndex > toIndex) {
+                // Créer une ligne inversée
+                const reversedLine: BusLine = {
+                    ...line,
+                    bus_id: line.bus_id,
+                    lineName: line.lineName,
+                    direction: 'INWARD',
+                    stops: [...line.stops].reverse() 
+                };
+                
+                const reversedFromIndex = line.stops.length - 1 - fromIndex;
+                const reversedToIndex = line.stops.length - 1 - toIndex;
+                
+                directLines.push({ 
+                    line: reversedLine, 
+                    fromIndex: reversedFromIndex, 
+                    toIndex: reversedToIndex 
+                });
+            }
         }
     }
+
     return directLines;
 }
 
@@ -101,7 +169,7 @@ async function findDirectLines(fromStopId: string, toStopId: string): Promise<{ 
  * Creating a walkstep
  */
 
-function createWalkStep(
+async function createWalkStep(
     fromLat: number,
     fromLon: number,
     toLat: number,
@@ -109,16 +177,15 @@ function createWalkStep(
     fromName?: string,
     toName?: string,
     toStopId?: string
-): WalkStep {
-    const distance = getDistance(fromLat, fromLon, toLat, toLon) * 1000;
-    const duration = (distance / 1000) / WALKING_SPEED * 60;
+): Promise<WalkStep> {
+    const { distance, duration } = await getRealWalkingDistance(fromLat, fromLon, toLat, toLon);
 
     return {
         type: 'walk',
         from: { lat: fromLat, lon: fromLon, name: fromName },
         to: { lat: toLat, lon: toLon, name: toName },
-        duration: Math.ceil(duration),
-        distance: Math.round(distance)
+        duration,
+        distance
     };
 }
 
@@ -185,7 +252,7 @@ export async function calculateRoutes(request: RouteRequest): Promise<RouteRespo
                 const steps: RouteStep[] = [];
 
                 if (!from.stopId) {
-                    steps.push(createWalkStep(
+                    steps.push(await createWalkStep(
                         from.lat, from.lon,
                         parseFloat(fromStop.latitude!), parseFloat(fromStop.longitude!),
                         from.name, fromStop.name, fromStop.stopPointId!
@@ -194,7 +261,7 @@ export async function calculateRoutes(request: RouteRequest): Promise<RouteRespo
                 steps.push(createBusStep(line, fromIndex, toIndex));
 
                 if (!to.stopId) {
-                    steps.push(createWalkStep(
+                    steps.push(await createWalkStep(
                         parseFloat(toStop.latitude!), parseFloat(toStop.longitude!),
                         to.lat, to.lon,
                         toStop.name, to.name
