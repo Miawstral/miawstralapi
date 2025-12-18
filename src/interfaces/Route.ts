@@ -9,7 +9,9 @@ export interface RouteRequest {
     to: Location;
     maxWalkingDistance?: number;
     maxTransfers?: number;
-    departureTime?: number;
+    departureTime?: string;  // Format HH:MM
+    arrivalTime?: string;    // Format HH:MM
+    excludedLines?: string[];
 }
 
 export interface WalkStep {
@@ -25,6 +27,7 @@ export interface BusStep {
     type: 'bus';
     line: string;
     lineName: string;
+    color: string;
     from: { stopId: string; name: string; lat: number; lon: number };
     to: { stopId: string; name: string; lat: number; lon: number };
     departureTime?: string;
@@ -48,6 +51,6 @@ export interface RouteOption {
 export interface RouteResponse {
     from: { lat: number; lon: number; name?: string };
     to: { lat: number; lon: number; name?: string };
-    routes: RouteOption[];
+    routes: RouteOption[] | null;
     calculationTime: number;
 }

@@ -229,6 +229,16 @@
                 <input type="number" id="maxWalking" value="500" min="100" max="2000" step="50">
             </div>
 
+            <div class="input-group">
+                <label>🚫 Lignes à exclure</label>
+                <select id="excludedLines" multiple style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; min-height: 100px;">
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <div style="font-size: 0.85rem; color: #666; margin-top: 0.5rem;">
+                    Maintenez Ctrl/Cmd pour sélectionner plusieurs lignes
+                </div>
+            </div>
+
             <button class="btn" id="searchBtn">🔍 Calculer l'itinéraire</button>
 
             <div id="message"></div>
@@ -243,8 +253,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
-        // Initialiser la carte centrée sur Marseille
-        const map = L.map('map').setView([43.296482, 5.369780], 13);
+        // Initialiser la carte centrée sur Toulon
+        const map = L.map('map').setView([43.1242, 5.9280], 12);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
@@ -286,12 +296,48 @@
             }
         });
 
+        // ✨ Charger les lignes disponibles au démarrage
+        async function loadAvailableLines() {
+            try {
+                const response = await fetch('http://localhost:3000/api/lines');
+                const data = await response.json();
+                
+                const select = document.getElementById('excludedLines');
+                select.innerHTML = ''; // Vider
+                
+                // Trier les lignes par numéro
+                const sortedLines = data.sort((a, b) => {
+                    const aNum = parseInt(a.bus_id);
+                    const bNum = parseInt(b.bus_id);
+                    if (isNaN(aNum) && isNaN(bNum)) return a.bus_id.localeCompare(b.bus_id);
+                    if (isNaN(aNum)) return 1;
+                    if (isNaN(bNum)) return -1;
+                    return aNum - bNum;
+                });
+                
+                sortedLines.forEach(line => {
+                    const option = document.createElement('option');
+                    option.value = line.bus_id;
+                    option.textContent = `Ligne ${line.bus_id}${line.lineName ? ' - ' + line.lineName : ''}`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load lines:', error);
+            }
+        }
+        
+        loadAvailableLines();
+
         // Recherche d'itinéraire
         document.getElementById('searchBtn').addEventListener('click', async () => {
             const fromValue = document.getElementById('from').value.trim();
             const toValue = document.getElementById('to').value.trim();
             const maxWalking = parseInt(document.getElementById('maxWalking').value);
-
+            
+            // ✨ Récupérer les lignes sélectionnées dans le select multiple
+            const selectElement = document.getElementById('excludedLines');
+            const excludedLines = Array.from(selectElement.selectedOptions).map(opt => opt.value);
+            
             if (!fromValue || !toValue) {
                 showMessage('Veuillez renseigner le départ et l\'arrivée', 'error');
                 return;
@@ -309,14 +355,22 @@
             document.getElementById('searchBtn').disabled = true;
 
             try {
+                const requestBody = {
+                    from: { lat: fromLat, lon: fromLon },
+                    to: { lat: toLat, lon: toLon },
+                    maxWalkingDistance: maxWalking
+                };
+
+                // ✨ Ajouter les lignes exclues si présentes
+                if (excludedLines.length > 0) {
+                    requestBody.excludedLines = excludedLines;
+                    console.log('Excluded lines:', excludedLines);
+                }
+
                 const response = await fetch('http://localhost:3000/api/routes/calculate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        from: { lat: fromLat, lon: fromLon },
-                        to: { lat: toLat, lon: toLon },
-                        maxWalkingDistance: maxWalking
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const data = await response.json();
@@ -324,7 +378,12 @@
                 if (data.success && data.data.routes.length > 0) {
                     currentRoutes = data.data.routes;
                     displayRoutes(data.data.routes);
-                    showMessage(`${data.data.routes.length} itinéraire(s) trouvé(s) en ${data.data.calculationTime}ms`, 'success');
+                    
+                    let message = `${data.data.routes.length} itinéraire(s) trouvé(s) en ${data.data.calculationTime}ms`;
+                    if (excludedLines.length > 0) {
+                        message += ` (lignes ${excludedLines.join(', ')} exclues)`;
+                    }
+                    showMessage(message, 'success');
                 } else {
                     showMessage('Aucun itinéraire trouvé', 'error');
                     document.getElementById('routesContainer').innerHTML = '';
@@ -398,25 +457,20 @@
             }
         }
 
+// src/pages/map/map.html - Modifier displayRouteOnMap
 function displayRouteOnMap(route) {
     // Supprimer les anciennes routes
     routeLayers.forEach(layer => map.removeLayer(layer));
     routeLayers = [];
 
-    const colors = {
-        walk: '#4A90E2',
-        bus: '#E74C3C'
-    };
-
     route.steps.forEach((step, index) => {
-        const color = colors[step.type];
+        // ✨ Utiliser la couleur du step (pour les bus) ou couleur par défaut
+        const color = step.type === 'bus' ? step.color : '#4A90E2';
         
-        // ✅ Utiliser la géométrie si disponible
         let coords;
         if (step.geometry && step.geometry.length > 0) {
-            coords = step.geometry; // Tracé réel depuis OSRM
+            coords = step.geometry;
         } else {
-            // Fallback : ligne droite
             coords = [
                 [step.from.lat, step.from.lon],
                 [step.to.lat, step.to.lon]
@@ -427,10 +481,9 @@ function displayRouteOnMap(route) {
             color: color,
             weight: step.type === 'bus' ? 6 : 4,
             opacity: 0.8,
-            dashArray: step.type === 'walk' ? '5, 10' : null // ✅ Pointillés pour la marche
+            dashArray: step.type === 'walk' ? '5, 10' : null
         }).addTo(map);
 
-        // ✅ Animation au survol
         line.on('mouseover', function() {
             this.setStyle({ weight: this.options.weight + 2, opacity: 1 });
         });
@@ -443,15 +496,13 @@ function displayRouteOnMap(route) {
             : `🚌 Bus ${step.line}: ${step.from.name} → ${step.to.name}`;
         
         line.bindPopup(popupContent);
-
         routeLayers.push(line);
 
-        // Ajouter des marqueurs pour les arrêts de bus
         if (step.type === 'bus') {
             const startMarker = L.circleMarker([step.from.lat, step.from.lon], {
                 radius: 8,
                 fillColor: '#fff',
-                color: color,
+                color: color, // ✨ Utiliser la couleur de la ligne
                 weight: 3,
                 fillOpacity: 1
             }).addTo(map).bindPopup(`<b>${step.from.name}</b><br>🚌 Bus ${step.line}<br>⏰ ${step.departureTime || 'N/A'}`);
@@ -459,7 +510,7 @@ function displayRouteOnMap(route) {
             const endMarker = L.circleMarker([step.to.lat, step.to.lon], {
                 radius: 8,
                 fillColor: '#fff',
-                color: color,
+                color: color, // ✨ Utiliser la couleur de la ligne
                 weight: 3,
                 fillOpacity: 1
             }).addTo(map).bindPopup(`<b>${step.to.name}</b><br>🚌 Bus ${step.line}`);
@@ -468,14 +519,12 @@ function displayRouteOnMap(route) {
         }
     });
 
-    // Ajuster la vue
     const allCoords = route.steps.flatMap(step => 
         step.geometry || [[step.from.lat, step.from.lon], [step.to.lat, step.to.lon]]
     );
     const bounds = L.latLngBounds(allCoords);
     map.fitBounds(bounds, { padding: [50, 50] });
 }
-
         function showMessage(text, type) {
             const msgDiv = document.getElementById('message');
             msgDiv.className = type;

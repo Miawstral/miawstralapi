@@ -16,9 +16,6 @@ const URBAN_FACTOR = 1.4;
 const USE_OSRM = process.env.USE_OSRM || 'true'; 
 const OSRM_URL = process.env.OSRM_URL || 'https://osrm.1sheol.xyz';
 
-
-
-
 let transportGraph: Map<string, any> | null = null;
 
 function getTransportGraph() {
@@ -169,9 +166,6 @@ async function resolveLocation(location: Location): Promise<{ lat: number; lon: 
 }
 
 /**
- * Check if 2 stops are on the same line.
- */
-/**
  * Vérifier si 2 arrêts sont sur la même ligne (dans les 2 sens)
  */
 async function findDirectLines(fromStopId: string, toStopId: string): Promise<{ line: BusLine; fromIndex: number; toIndex: number }[]> {
@@ -186,29 +180,7 @@ async function findDirectLines(fromStopId: string, toStopId: string): Promise<{ 
         const toIndex = line.stops.findIndex(s => s.stopPointId === toStopId);
 
         if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
-            // Sens normal (OUTWARD)
-            if (fromIndex < toIndex) {
-                directLines.push({ line, fromIndex, toIndex });
-            }
-            else if (fromIndex > toIndex) {
-                // Créer une ligne inversée
-                const reversedLine: BusLine = {
-                    ...line,
-                    bus_id: line.bus_id,
-                    lineName: line.lineName,
-                    direction: 'INWARD',
-                    stops: [...line.stops].reverse() 
-                };
-                
-                const reversedFromIndex = line.stops.length - 1 - fromIndex;
-                const reversedToIndex = line.stops.length - 1 - toIndex;
-                
-                directLines.push({ 
-                    line: reversedLine, 
-                    fromIndex: reversedFromIndex, 
-                    toIndex: reversedToIndex 
-                });
-            }
+            directLines.push({ line, fromIndex, toIndex });
         }
     }
 
@@ -242,19 +214,80 @@ async function createWalkStep(
 }
 
 /**
- * Creating a busStep
+ * parse a time "HH:MM" in minutes since midnight (00:00)
  */
 
-async function createBusStep(line: BusLine, fromIndex: number, toIndex: number): Promise<BusStep> {
+function parseTime(timeStr: string): number | null {
+    if (!timeStr || !timeStr.includes(':')) return null;
+
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return null;
+
+    return hours * 60 + minutes;
+}
+
+async function createBusStep(line: BusLine, fromIndex: number, toIndex: number, requestedTime?: string): Promise<BusStep> {
+    const isReverse = fromIndex > toIndex;
+    const stopsCount = Math.abs(toIndex - fromIndex);
+    const startIndex = Math.min(fromIndex, toIndex);
+    const endIndex = Math.max(fromIndex, toIndex);
+
     const fromStop = line.stops[fromIndex];
     const toStop = line.stops[toIndex];
-    const stopsCount = toIndex - fromIndex;
 
     const geometry: [number, number][] = [];
-    let totalDuration = 0;
     let totalDistance = 0;
+    let realDuration = 0;
+    let selectedDepartureTime = '';
+    let selectedArrivalTime = '';
 
-    for (let i = fromIndex; i < toIndex; i++) {
+    // Only try to find schedules for OUTWARD direction (fromIndex < toIndex)
+    // For reverse direction, we would need INWARD data which we don't have
+    if (!isReverse && fromStop.times && toStop.times && fromStop.times.length > 0 && toStop.times.length > 0) {
+        const requestedMinutes = requestedTime ? parseTime(requestedTime) : null;
+        let bestIndex = -1;
+        let bestDuration = Infinity;
+        
+        // Try to find a schedule where the trip makes sense (departure before arrival)
+        for (let i = 0; i < Math.min(fromStop.times.length, toStop.times.length); i++) {
+            const depTime = parseTime(fromStop.times[i]);
+            const arrTime = parseTime(toStop.times[i]);
+            
+            if (depTime === null || arrTime === null) continue;
+            
+            // Calculate duration (handle midnight crossing)
+            let duration;
+            if (arrTime >= depTime) {
+                duration = arrTime - depTime;
+            } else {
+                // Crosses midnight
+                duration = (24 * 60 - depTime) + arrTime;
+            }
+            
+            // Only consider reasonable durations (1 min to 3 hours)
+            if (duration < 1 || duration > 180) continue;
+            
+            // If requestedTime is specified, only consider departures after it
+            if (requestedMinutes !== null && depTime < requestedMinutes) continue;
+            
+            // Take the first valid schedule (or earliest after requested time)
+            if (bestIndex === -1) {
+                bestIndex = i;
+                bestDuration = duration;
+                break;
+            }
+        }
+        
+        if (bestIndex !== -1) {
+            selectedDepartureTime = fromStop.times[bestIndex];
+            selectedArrivalTime = toStop.times[bestIndex];
+            realDuration = bestDuration;
+            console.log(`[BUS] ${line.bus_id}: ${fromStop.name} (${selectedDepartureTime}) -> ${toStop.name} (${selectedArrivalTime}) = ${realDuration}min.`);
+        }
+    }
+
+    // Build geometry for the route
+    for (let i = startIndex; i < endIndex; i++) {
         const current = line.stops[i];
         const next = line.stops[i + 1];
 
@@ -265,48 +298,170 @@ async function createBusStep(line: BusLine, fromIndex: number, toIndex: number):
             parseFloat(next.longitude!),
             'car'
         );
-        geometry.push(...segment.geometry);
-        totalDuration += segment.duration;
+        
+        // Add geometry in correct order based on direction
+        if (isReverse) {
+            geometry.unshift(...segment.geometry.reverse());
+        } else {
+            geometry.push(...segment.geometry);
+        }
         totalDistance += segment.distance;
     }
+    
+    // If we don't have real duration from schedules, calculate average from stop-to-stop
+    if (realDuration <= 0) {
+        console.log(`[BUS] ${line.bus_id}: No valid schedule found, calculating average duration`);
+        for (let i = startIndex; i < endIndex; i++) {
+            const current = line.stops[i];
+            const next = line.stops[i + 1];
+            
+            if (current.times && next.times && current.times.length > 0 && next.times.length > 0) {
+                const durations: number[] = [];
+                
+                for (let j = 0; j < Math.min(current.times.length, next.times.length); j++) {
+                    const currentTime = parseTime(current.times[j]);
+                    const nextTime = parseTime(next.times[j]);
+                    
+                    if (currentTime !== null && nextTime !== null) {
+                        let dur = nextTime >= currentTime 
+                            ? nextTime - currentTime 
+                            : (24 * 60 - currentTime) + nextTime;
+                        
+                        if (dur > 0 && dur < 120) {
+                            durations.push(dur);
+                        }
+                    }
+                }
+                
+                if (durations.length > 0) {
+                    const avgDur = durations.reduce((sum, d) => sum + d, 0) / durations.length;
+                    realDuration += Math.round(avgDur);
+                } else {
+                    realDuration += 5;
+                }
+            } else {
+                realDuration += 5;
+            }
+        }
+    }
+    
+    // Use original line stops for the from/to data (correct coordinates)
+    const originalFromStop = line.stops[fromIndex];
+    const originalToStop = line.stops[toIndex];
+    
     return {
         type: 'bus',
         line: line.bus_id,
         lineName: line.lineName || line.bus_id,
+        color: getLineColor(line.bus_id),
         from: {
-            stopId: fromStop.stopPointId!,
-            name: fromStop.name,
-            lat: parseFloat(fromStop.latitude!),
-            lon: parseFloat(fromStop.longitude!)
+            stopId: originalFromStop.stopPointId!,
+            name: originalFromStop.name,
+            lat: parseFloat(originalFromStop.latitude!),
+            lon: parseFloat(originalFromStop.longitude!)
         },
         to: {
-            stopId: toStop.stopPointId!,
-            name: toStop.name,
-            lat: parseFloat(toStop.latitude!),
-            lon: parseFloat(toStop.longitude!)
+            stopId: originalToStop.stopPointId!,
+            name: originalToStop.name,
+            lat: parseFloat(originalToStop.latitude!),
+            lon: parseFloat(originalToStop.longitude!)
         },
-        departureTime: fromStop.times[0],
+        departureTime: selectedDepartureTime || undefined,
+        arrivalTime: selectedArrivalTime || undefined,
         stopsCount,
-        duration: totalDuration,
+        duration: realDuration,
         distance: totalDistance,
         geometry
     };
 }
 
 /**
- * Calculate a score for the route
+ * Calculate a score for the route (lower is better)
+ * Priority: 1) Direct lines (no transfers), 2) Fewer transfers, 3) Shorter duration
  */
 function calculateScore(route: RouteOption): number {
-    return route.duration + (route.transfers * TRANSFER_PENALTY) + (route.walkingDistance / 100);
+    // Transfers are EXTREMELY penalizing (30 min per transfer = 1800 points)
+    const transferScore = route.transfers * 1800;
+    // Duration is secondary (1 point per minute)
+    const durationScore = route.duration;
+    // Walking is least important (1 point per 100m)
+    const walkingScore = route.walkingDistance / 100;
+    
+    return transferScore + durationScore + walkingScore;
 }
 
 /**
- * Calculate routes from A to B
+ * Generate consistent color for each bus line
+ */
+function getLineColor(lineId: string): string {
+    const colorMap: Record<string, string> = {
+        '1' : "#303f9f",
+        '2': "#4db6ac",
+        '3' : "#f44336",
+        '6' : '#03a9f4',
+        '9' : '#9ccc65',
+        '10' : "#546e7a",
+        '11' : '#ab47bc',
+        '12' : '#d32f2f',
+        '15' : '#212121',
+        '16' : '#ba68c8',
+        '17' : '#f44336',
+        '18' : '#e1bee7',
+        '20' : '#ffa000',
+        '23' : '#6F304E',
+        '28' : '#8bc34a',
+        '29' : '#00e676',
+        '31' : '#ff9800',
+        '33' : '#ffeb3b',
+        '36' : '#7e57c2',
+        '39' : '#388e3c',
+        '40' : '#3f51b5',
+        '55' : '#7cb342',
+        '63' : '#90caf9',
+        '65' : '#29b6f6',
+        '67' : '#ffeb3b',
+        '68' : '#915A42',
+        '70' : '#00acc1',
+        '72' : '#cddc39',
+        '81' : '#ef5350',
+        '82' : '#f9a825',
+        '83' : '#fdd835',
+        '84' : '#f06292',
+        '87' : '#90caf9',
+        '91' : '#f06292',
+        '92' : '#ffa000',
+        '98' : '#fdd835',
+        '101' : '#29b6f6',
+        '102' : '#f06292',
+        '103' : '#546e7a',
+        '111' : '#fdd835',
+        '112' : '#f06292',
+        '120' : '#fdd835',
+        '129' : '#29b6f6',
+        '191' : '#d32f2f',
+    }
+
+    if (colorMap[lineId]){
+        return colorMap[lineId];
+    }
+
+    let hash = 0;
+    for (let i = 0; i < lineId.length; i++) {
+        hash = lineId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 65%, 50%)`;
+}
+
+/**
+ * Calculate routes from A to B using Dijkstra pathfinding
  */
 export async function calculateRoutes(request: RouteRequest): Promise<RouteResponse> {
     const startTime = Date.now();
     const maxWalking = request.maxWalkingDistance || 500;
     const maxTransfers = request.maxTransfers || 2;
+    const excludedLines = request.excludedLines || [];
+    const requestedTime = request.departureTime || request.arrivalTime;
 
     const from = await resolveLocation(request.from);
     const to = await resolveLocation(request.to);
@@ -319,15 +474,16 @@ export async function calculateRoutes(request: RouteRequest): Promise<RouteRespo
 
     console.log(`[ROUTING] Found ${fromStops.length} departure stops and ${toStops.length} arrival stops`);
 
-    const graph = getTransportGraph()
+    const graph = getTransportGraph();
+    
     for (const fromStop of fromStops.slice(0, 3)) {
         for (const toStop of toStops.slice(0, 3)) {
-            const path = dijkstra(graph, fromStop.stopPointId!, toStop.stopPointId!, maxTransfers);
+            const path = dijkstra(graph, fromStop.stopPointId!, toStop.stopPointId!, maxTransfers, excludedLines);
 
             if (!path || path.length === 0) continue;
 
             const steps: RouteStep[] = [];
-            if(!from.stopId) {
+            if (!from.stopId) {
                 steps.push(await createWalkStep(
                     from.lat, from.lon,
                     parseFloat(fromStop.latitude!), parseFloat(fromStop.longitude!),
@@ -337,7 +493,7 @@ export async function calculateRoutes(request: RouteRequest): Promise<RouteRespo
 
             for (const edge of path) {
                 if (edge.type === 'bus' && edge.busLine) {
-                    steps.push(await createBusStep(edge.busLine, edge.fromIndex!, edge.toIndex!));
+                    steps.push(await createBusStep(edge.busLine, edge.fromIndex!, edge.toIndex!, requestedTime));
                 }
             }
 
@@ -354,12 +510,13 @@ export async function calculateRoutes(request: RouteRequest): Promise<RouteRespo
 
             let transfers = 0;
             for (let i = 1; i < steps.length; i++) {
-                if (steps[i].type === 'bus' && steps[i - 1].type === 'bus'){
+                if (steps[i].type === 'bus' && steps[i - 1].type === 'bus') {
                     const prev = steps[i - 1] as BusStep;
                     const curr = steps[i] as BusStep;
                     if (prev.line !== curr.line) transfers++;
                 }
             }
+            
             const route: RouteOption = {
                 duration: Math.ceil(totalDuration),
                 transfers,
@@ -369,17 +526,17 @@ export async function calculateRoutes(request: RouteRequest): Promise<RouteRespo
             };
             route.score = calculateScore(route);
             routes.push(route);
-        };
-
-        routes.sort((a, b) => a.score - b.score);
-        const calculationTime = Date.now() - startTime;
-
-        console.log(`[ROUTING] Found ${routes.length} routes in ${calculationTime}ms`);
-        return {
-            from,
-            to,
-            routes: routes.slice(0, 5),
-            calculationTime
         }
     }
+
+    routes.sort((a, b) => a.score - b.score);
+    const calculationTime = Date.now() - startTime;
+
+    console.log(`[ROUTING] Found ${routes.length} routes in ${calculationTime}ms`);
+    return {
+        from,
+        to,
+        routes: routes.slice(0, 5),
+        calculationTime
+    };
 }

@@ -34,6 +34,56 @@ interface PathNode {
     edge: Edge | null;
 }
 
+/**
+ * Parse a time "HH:MM" to minutes since midnight
+ */
+function parseTime(timeStr: string): number | null {
+    if (!timeStr || !timeStr.includes(':')) return null;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    return hours * 60 + minutes;
+}
+
+/**
+ * Calculate average duration between two stops based on actual schedules
+ */
+function calculateAverageDuration(fromStop: any, toStop: any): number {
+    if (!fromStop.times || !toStop.times || fromStop.times.length === 0 || toStop.times.length === 0) {
+        return 5; // Default 5 minutes if no schedule data
+    }
+    
+    const durations: number[] = [];
+    const maxIndex = Math.min(fromStop.times.length, toStop.times.length);
+    
+    for (let i = 0; i < maxIndex; i++) {
+        const depTime = parseTime(fromStop.times[i]);
+        const arrTime = parseTime(toStop.times[i]);
+        
+        if (depTime !== null && arrTime !== null) {
+            let duration;
+            if (arrTime < depTime) {
+                // Handle midnight crossing
+                duration = (24 * 60 - depTime) + arrTime;
+            } else {
+                duration = arrTime - depTime;
+            }
+            
+            // Only add reasonable durations (between 1 min and 120 min)
+            if (duration > 0 && duration < 120) {
+                durations.push(duration);
+            }
+        }
+    }
+    
+    if (durations.length === 0) {
+        return 5; // Default if no valid durations found
+    }
+    
+    // Return average duration
+    const avg = durations.reduce((sum, d) => sum + d, 0) / durations.length;
+    return Math.round(avg);
+}
+
 export function buildTransportGraph(): Map<string, Edge[]> {
     const graph = new Map<string, Edge[]>();
     const files = fs.readdirSync(dataDir).filter(file => file.endsWith('_horaires.json'));
@@ -55,8 +105,10 @@ export function buildTransportGraph(): Map<string, Edge[]> {
                 parseFloat(to.longitude!)
             ) * 1000;
 
-            const duration = (distance / 1000) / 20 * 60;
+            // Calculate duration based on actual schedules instead of speed
+            const duration = calculateAverageDuration(from, to);
 
+            // OUTWARD: from stop i to stop i+1 (forward direction)
             const edgeOutward: Edge = {
                 from: from.stopPointId,
                 to: to.stopPointId,
@@ -71,6 +123,8 @@ export function buildTransportGraph(): Map<string, Edge[]> {
                 busLine: line
             };
 
+            // INWARD: from stop i+1 to stop i (reverse direction)
+            // IMPORTANT: Swap fromIndex and toIndex for reverse direction
             const edgeInward: Edge = {
                 from: to.stopPointId,
                 to: from.stopPointId,
@@ -80,8 +134,8 @@ export function buildTransportGraph(): Map<string, Edge[]> {
                 distance,
                 stopsCount: 1,
                 type: 'bus',
-                fromIndex: i,
-                toIndex: i + 1,
+                fromIndex: i + 1,
+                toIndex: i,
                 busLine: line   
             };
 
@@ -138,7 +192,8 @@ export function dijkstra(
     graph: Map<string, Edge[]>,
     startStopId: string,
     endStopId: string,
-    maxTransfers: number = 2
+    maxTransfers: number = 2,
+    excludedLines: string[] = []
 ): Edge[] | null {
     const distances = new Map<string, number>();
     const previous = new Map<string, { stopId: string; edge: Edge } | null>();
@@ -163,6 +218,10 @@ export function dijkstra(
         const edges = graph.get(current) || [];
         
         for(const edge of edges) {
+            if (excludedLines.includes(edge.line)) {
+                console.log(`[DIJKSTRA] Skip eccluded line ${edge.line}`);
+                continue;
+            }
             const neighbor = edge.to;
             const newDistance = currentDistance + edge.duration;
 
