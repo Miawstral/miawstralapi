@@ -1,0 +1,32 @@
+# Ignore node_modules and build artifacts
+node_modules/
+dist/
+*.log
+
+# Ignore development files
+*.env
+.env.*
+
+# Ignore test files
+tests/
+*.test.js
+*.test.ts
+
+# Ignore documentation
+readme.md
+ROUTING_ALGORITHM.md
+LICENSE
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore IDE
+.vscode/
+.idea/
+
+# Ignore JavaScript sources (we only need the data)
+javascript/
+
+# Ignore Python
+python/

@@ -15,10 +15,11 @@ export function parseTime(timeStr: string): number | null {
     return hours * 60 + minutes;
 }
 
+
 /**
  * Connection represents a direct bus trip between two stops at a specific time
  */
-interface Connection {
+export interface Connection {
     line: BusLine;
     fromStopId: string;
     toStopId: string;
@@ -103,10 +104,10 @@ export function findDirectConnections(
 
     // Group connections by line to find multi-stop journeys
     const lineGroups = new Map<string, Connection[]>();
-    
+
     for (const conn of connections) {
         if (conn.departureTime < departureAfter) continue;
-        
+
         const key = `${conn.line.bus_id}`;
         if (!lineGroups.has(key)) {
             lineGroups.set(key, []);
@@ -117,34 +118,34 @@ export function findDirectConnections(
     // For each line, check if we can go from fromStop to toStop
     for (const [lineKey, lineConns] of lineGroups) {
         const line = lineConns[0].line;
-        
+
         // Find indices in the line
         const fromIdx = line.stops.findIndex(s => s.stopPointId === fromStopId);
         const toIdx = line.stops.findIndex(s => s.stopPointId === toStopId);
-        
+
         if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) continue;
-        
+
         // Check each schedule
         const fromStop = line.stops[fromIdx];
         const toStop = line.stops[toIdx];
-        
+
         if (!fromStop.times || !toStop.times) continue;
-        
+
         for (let i = 0; i < Math.min(fromStop.times.length, toStop.times.length); i++) {
             const depTime = parseTime(fromStop.times[i]);
             const arrTime = parseTime(toStop.times[i]);
-            
+
             if (depTime === null || arrTime === null || depTime < departureAfter) continue;
-            
+
             let duration;
             if (arrTime >= depTime) {
                 duration = arrTime - depTime;
             } else {
                 duration = (24 * 60 - depTime) + arrTime;
             }
-            
+
             if (duration < 1 || duration > 180) continue;
-            
+
             direct.push({
                 line,
                 fromStopId,
@@ -174,40 +175,40 @@ export function findBestJourneysCSA(
 ): Journey[] {
     console.log(`[CSA] Starting with ${allConnections.length} total connections`);
     console.log(`[CSA] From stops: ${fromStopIds.length}, To stops: ${toStopIds.length}`);
-    console.log(`[CSA] Departure after: ${departureAfter} (${Math.floor(departureAfter/60)}:${String(departureAfter%60).padStart(2,'0')})`);
-    
+    console.log(`[CSA] Departure after: ${departureAfter} (${Math.floor(departureAfter / 60)}:${String(departureAfter % 60).padStart(2, '0')})`);
+
     // Filter connections that depart after requested time
     const validConnections = allConnections.filter(c => c.departureTime >= departureAfter);
     console.log(`[CSA] Valid connections after time filter: ${validConnections.length}`);
-    
+
     // Track earliest arrival time at each stop
     const earliestArrival = new Map<string, number>();
-    
+
     // Track how we got to each stop (parent connection)
     const reachedBy = new Map<string, Connection | null>();
-    
+
     // Track the number of transfers to reach each stop
     const transfersTo = new Map<string, number>();
-    
+
     // Initialize starting positions
     for (const stopId of fromStopIds) {
         earliestArrival.set(stopId, departureAfter);
         reachedBy.set(stopId, null);
         transfersTo.set(stopId, 0);
     }
-    
+
     // Scan all connections in order
     for (const conn of validConnections) {
         const arrivalAtFromStop = earliestArrival.get(conn.fromStopId);
-        
+
         // Can we catch this connection?
         if (arrivalAtFromStop === undefined) continue;
         if (arrivalAtFromStop > conn.departureTime) continue;
-        
+
         // Calculate transfers: if we came from a different connection, it's a transfer
         const previousConn = reachedBy.get(conn.fromStopId);
         const currentTransfers = transfersTo.get(conn.fromStopId) || 0;
-        
+
         // If previous connection exists and is on a different line, it's a transfer
         let newTransfers = currentTransfers;
         if (previousConn !== null && previousConn !== undefined) {
@@ -215,42 +216,42 @@ export function findBestJourneysCSA(
                 newTransfers = currentTransfers + 1;
             }
         }
-        
+
         // Would this require too many transfers?
         if (newTransfers > maxTransfers) continue;
-        
+
         // Can we improve the arrival time at the destination?
         const currentBestArrival = earliestArrival.get(conn.toStopId);
-        
+
         if (currentBestArrival === undefined || conn.arrivalTime < currentBestArrival) {
             earliestArrival.set(conn.toStopId, conn.arrivalTime);
             reachedBy.set(conn.toStopId, conn);
             transfersTo.set(conn.toStopId, newTransfers);
         }
     }
-    
+
     // Reconstruct journeys to all reachable destinations
     const journeys: Journey[] = [];
-    
+
     for (const toStopId of toStopIds) {
         if (!earliestArrival.has(toStopId)) continue;
-        
+
         // Reconstruct path backwards
         const path: Connection[] = [];
         let currentStopId: string | null = toStopId;
-        
+
         while (currentStopId) {
             const connToThisStop = reachedBy.get(currentStopId);
             if (!connToThisStop) break;
             path.unshift(connToThisStop);
             currentStopId = connToThisStop.fromStopId;
         }
-        
+
         if (path.length === 0) continue;
-        
+
         // Verify the path starts from one of our start stops
         if (!fromStopIds.includes(path[0].fromStopId)) continue;
-        
+
         journeys.push({
             connections: path,
             totalDuration: earliestArrival.get(toStopId)! - departureAfter,
@@ -259,19 +260,20 @@ export function findBestJourneysCSA(
             arrivalTime: earliestArrival.get(toStopId)!
         });
     }
-    
+
     console.log(`[CSA] Found ${journeys.length} journeys`);
-    
+
     // Sort by: 1) fewer transfers, 2) earlier arrival
     journeys.sort((a, b) => {
         if (a.transfers !== b.transfers) return a.transfers - b.transfers;
         return a.arrivalTime - b.arrivalTime;
     });
-    
+
     return journeys.slice(0, 5);
 }
 
-interface Journey {
+
+export interface Journey {
     connections: Connection[];
     totalDuration: number;
     transfers: number;
@@ -287,12 +289,12 @@ export function journeyToSteps(journey: Journey): Connection[] {
     // Merge consecutive connections on the same line
     const merged: Connection[] = [];
     let current = journey.connections[0];
-    
+
     for (let i = 1; i < journey.connections.length; i++) {
         const next = journey.connections[i];
-        
+
         // Same line and consecutive in time?
-        if (current.line.bus_id === next.line.bus_id && 
+        if (current.line.bus_id === next.line.bus_id &&
             current.toStopId === next.fromStopId &&
             current.arrivalTime <= next.departureTime) {
             // Merge
@@ -309,6 +311,6 @@ export function journeyToSteps(journey: Journey): Connection[] {
         }
     }
     merged.push(current);
-    
+
     return merged;
 }
