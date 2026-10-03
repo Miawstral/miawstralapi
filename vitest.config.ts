@@ -7,6 +7,8 @@ export default defineConfig({
         env: {
             LOG_LEVEL: 'silent',
             USE_OSRM: 'false',
+            REALTIME: 'false',
+            GTFS_REFRESH_HOURS: '0',
         },
     },
 });

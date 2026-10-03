@@ -23,3 +23,6 @@ flaresolverr_windows_x64.zip
 # Lockfiles of other package managers (the project uses bun.lock)
 package-lock.json
 bun.lockb
+
+# Downloaded timetables (GTFS cache)
+data/

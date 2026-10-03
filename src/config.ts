@@ -43,8 +43,6 @@ export const config = {
     clientDir: resolvePath(process.env.CLIENT_DIR, path.join(projectRoot, 'client', 'dist')),
 
     timezone: process.env.TZ_NETWORK ?? 'Europe/Paris',
-    /** Mirror the scraped direction of a line when the other one is missing. */
-    estimateMissingDirections: bool('ESTIMATE_MISSING_DIRECTIONS', true),
 
     /**
      * Street-level geometries. One osrm-routed serves one profile, so walking and
@@ -60,29 +58,29 @@ export const config = {
         cooldownMs: int('OSRM_COOLDOWN_MS', 60_000),
     },
 
-    scraper: {
-        flaresolverrUrl: process.env.FLARESOLVERR_URL ?? 'http://localhost:8191/v1',
-        timeoutMs: int('FLARESOLVERR_TIMEOUT_MS', 60_000),
-        /** Lines scraped in parallel, each by its own browser session (SCRAPER_BATCH_SIZE before 2.0). */
-        concurrency: Math.max(1, int('SCRAPER_CONCURRENCY', int('SCRAPER_BATCH_SIZE', 2))),
-        /** Pause of each worker between two lines. */
-        delayMs: int('SCRAPER_DELAY_MS', int('SCRAPER_BATCH_DELAY_MS', 500)),
-        maxRetries: int('SCRAPER_MAX_RETRIES', 3),
-        /** Highest numeric line id tried during a full scan. */
-        maxLineId: int('SCRAPER_MAX_LINE_ID', 300),
-        /** Day of the timetables to scrape (YYYY-MM-DD). Default: the next working day. */
-        date: process.env.SCRAPER_DATE ?? '',
-        /**
-         * Refresh the timetables automatically every N hours (0 = never). At
-         * startup, a refresh runs right away when the data is older than that or
-         * still in the legacy format.
-         */
-        autoRefreshHours: int('AUTO_REFRESH_HOURS', 0),
-        /** Delay before the startup refresh, to let FlareSolverr start. */
-        autoRefreshDelayMs: int('AUTO_REFRESH_DELAY_MS', 20_000),
+    /** Official open data of the Réseau Mistral (transport.data.gouv.fr). */
+    gtfs: {
+        url: process.env.GTFS_URL ?? 'https://www.data.gouv.fr/api/1/datasets/r/b0789d9e-5077-4124-b6b2-773353ada8cf',
+        /** Check for a new timetable every N hours (0 = never). */
+        refreshHours: int('GTFS_REFRESH_HOURS', 12),
+    },
+    realtime: {
+        enabled: bool('REALTIME', true),
+        vehiclePositionsUrl:
+            process.env.GTFS_RT_VEHICLES_URL ?? 'https://www.data.gouv.fr/api/1/datasets/r/9fe8291c-2fb2-4f89-b578-282ba05dd999',
+        tripUpdatesUrl:
+            process.env.GTFS_RT_TRIP_UPDATES_URL ?? 'https://www.data.gouv.fr/api/1/datasets/r/10f2e5d4-6a1b-45e2-897a-5b9044ebb6b3',
+        alertsUrl: process.env.GTFS_RT_ALERTS_URL ?? 'https://www.data.gouv.fr/api/1/datasets/r/f30614b3-a35b-4c9f-98c9-7450585d3941',
+        /** Feeds are fetched on demand, at most once per this many seconds. */
+        vehiclesTtlSeconds: int('REALTIME_VEHICLES_TTL', 10),
+        tripUpdatesTtlSeconds: int('REALTIME_TRIP_UPDATES_TTL', 20),
+        alertsTtlSeconds: int('REALTIME_ALERTS_TTL', 120),
     },
 
-    /** Required (Bearer token) to call the data refresh endpoints. They are disabled when empty. */
+    /** Requests per minute and per IP on the expensive endpoints (0 = unlimited). */
+    rateLimitPerMinute: int('RATE_LIMIT_PER_MINUTE', 120),
+
+    /** Required (Bearer token) to force a timetable refresh. The endpoint is disabled when empty. */
     adminToken: process.env.ADMIN_TOKEN ?? '',
 } as const;
 

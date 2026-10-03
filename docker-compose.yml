@@ -1,16 +1,13 @@
-# Everything needed to run Miawstral locally, from scratch:
+# Miawstral, everything included:
 #
 #   docker compose up -d --build
 #
-# - app           API + web interface on http://localhost:3000
-# - flaresolverr  passes Cloudflare to scrape the timetables (automatic refresh)
-# - osrm-prepare  one-shot: downloads OpenStreetMap (Var, ~80 MB) and builds the
-#                 routing graphs (first start only, a few minutes)
-# - osrm-foot     walking paths drawn on the map
-# - osrm-car      bus paths drawn on the map
-#
-# The app is usable right away: until OSRM is ready, paths are straight lines,
-# and the timetables shipped in the image are used until the first refresh ends.
+# - app           API + web interface on http://localhost:3000 (documentation: /docs).
+#                 Timetables come from the official open data of the Réseau Mistral
+#                 (GTFS, downloaded on start and refreshed), real time from its GTFS-RT feeds.
+# - osrm-prepare  one-shot, first start only: downloads OpenStreetMap (Var, ~80 MB) and
+#                 builds the walking graph (about a minute).
+# - osrm-foot     walking paths drawn on the map (bus paths use the official shapes).
 
 x-osrm-image: &osrm-image ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
 
@@ -22,31 +19,9 @@ services:
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
-      FLARESOLVERR_URL: http://flaresolverr:8191/v1
-      SCRAPER_CONCURRENCY: ${SCRAPER_CONCURRENCY:-1}
-      AUTO_REFRESH_HOURS: ${AUTO_REFRESH_HOURS:-24}
       OSRM_FOOT_URL: http://osrm-foot:5000
-      OSRM_CAR_URL: http://osrm-car:5000
     volumes:
-      # Scraped timetables survive rebuilds (initialised from the image the first time).
       - miawstral-data:/app/data
-    depends_on:
-      flaresolverr:
-        condition: service_started
-    restart: unless-stopped
-
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
-    # Chrome crashes ("tab crashed") with Docker's default 64 MB of shared memory.
-    shm_size: 1gb
-    environment:
-      LOG_LEVEL: info
-      TZ: Europe/Paris
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8191/health', timeout=5)"]
-      interval: 30s
-      timeout: 10s
-      start_period: 20s
     restart: unless-stopped
 
   osrm-prepare:
@@ -68,22 +43,11 @@ services:
     depends_on:
       osrm-prepare:
         condition: service_completed_successfully
-    healthcheck: &osrm-health
+    healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
       interval: 30s
       timeout: 5s
       start_period: 30s
-    restart: unless-stopped
-
-  osrm-car:
-    image: *osrm-image
-    command: osrm-routed --algorithm mld --max-viaroute-size 1000 /data/car/toulon.osrm
-    volumes:
-      - osrm-data:/data:ro
-    depends_on:
-      osrm-prepare:
-        condition: service_completed_successfully
-    healthcheck: *osrm-health
     restart: unless-stopped
 
 volumes:

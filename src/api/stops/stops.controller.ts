@@ -1,12 +1,13 @@
 import type { Request, Response } from 'express';
-import { config } from '../../config';
-import { nowInTimezone } from '../../lib/time';
 import { getNetwork } from '../../network/network.store';
-import { optionalNumber, optionalTime, requiredNumber, requiredString } from '../validation';
+import { resolveServiceTime } from '../service-time';
+import { optionalBoolean, optionalDate, optionalNumber, optionalTime, requiredNumber, requiredString } from '../validation';
 import * as stopsService from './stops.service';
+import { sendCachedJson } from '../http-cache';
 
 export const getAll = (_req: Request, res: Response) => {
-    res.json(stopsService.listStops(getNetwork()));
+    const network = getNetwork();
+    sendCachedJson(res, `stops:${network.serviceDate}:${network.loadedAt.getTime()}`, () => stopsService.listStops(network));
 };
 
 export const search = (req: Request, res: Response) => {
@@ -24,11 +25,14 @@ export const findNearby = (req: Request, res: Response) => {
 };
 
 export const getById = (req: Request<{ id: string }>, res: Response) => {
-    res.json(stopsService.getStopDetails(getNetwork(), req.params.id));
+    const { date } = resolveServiceTime(optionalDate(req.query.date, 'date'), undefined);
+    res.json(stopsService.getStopDetails(getNetwork(date), req.params.id));
 };
 
-export const getDepartures = (req: Request<{ id: string }>, res: Response) => {
-    const after = optionalTime(req.query.time, 'time') ?? nowInTimezone(config.timezone);
+export const getDepartures = async (req: Request<{ id: string }>, res: Response) => {
+    const { date, minutes } = resolveServiceTime(optionalDate(req.query.date, 'date'), optionalTime(req.query.time, 'time'));
     const limit = optionalNumber(req.query.limit, 'limit', { min: 1, max: 50, integer: true }) ?? 10;
-    res.json(stopsService.getDepartures(getNetwork(), req.params.id, after, limit));
+    const area = optionalBoolean(req.query.area, 'area') ?? true;
+    res.set('Cache-Control', 'no-cache');
+    res.json(await stopsService.getDepartures(getNetwork(date), req.params.id, minutes, limit, area));
 };

@@ -1,7 +1,7 @@
 {
   "name": "reseau-miawstral",
   "version": "2.0.0",
-  "description": "API et calculateur d'itinéraires pour le Réseau Mistral de la métropole Toulon Provence Méditerranée.",
+  "description": "API temps réel et calculateur d'itinéraires pour le Réseau Mistral (Toulon), à partir des données ouvertes officielles.",
   "main": "dist/server.js",
   "engines": {
     "node": ">=20.12"
@@ -15,31 +15,33 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "scrape": "tsx src/scraper/cli.ts",
     "client:dev": "cd client && bun run dev",
     "client:build": "cd client && bun install --frozen-lockfile && bun run build"
   },
   "keywords": [
     "reseau-mistral",
-    "api",
     "toulon",
-    "bus",
-    "raptor"
+    "gtfs",
+    "gtfs-rt",
+    "raptor",
+    "transport",
+    "api"
   ],
   "author": "Ivy-Js",
   "license": "GPL-3.0-or-later",
   "dependencies": {
-    "cheerio": "^1.0.0",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "swagger-ui-express": "^5.0.1"
+    "fflate": "^0.8.3",
+    "gtfs-realtime-bindings": "^2.2.0"
   },
   "devDependencies": {
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
     "@types/supertest": "^7.2.1",
-    "@types/swagger-ui-express": "^4.1.8",
     "concurrently": "^10.0.5",
     "supertest": "^7.0.0",
     "tsx": "^4.19.0",

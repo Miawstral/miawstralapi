@@ -2,6 +2,7 @@ import type { Departure, StopDetails, StopSummary } from '../../interfaces/BusDa
 import { notFound } from '../../lib/http-error';
 import { formatTime } from '../../lib/time';
 import type { NetworkStop, TransitNetwork } from '../../network/network';
+import { expectedTime, tripDelays, tripUpdatesOrNull } from '../../realtime/enrich';
 
 export function toStopSummary(stop: NetworkStop, distance?: number): StopSummary {
     return {
@@ -41,7 +42,6 @@ export function nearbyStops(network: TransitNetwork, lat: number, lon: number, r
 export function getStopDetails(network: TransitNetwork, id: string): StopDetails {
     const stop = requireStop(network, id);
     const passingLines: StopDetails['passingLines'] = [];
-
     for (const lineId of stop.lines) {
         const line = network.lines.get(lineId)!;
         for (const dir of line.directions) {
@@ -56,9 +56,10 @@ export function getStopDetails(network: TransitNetwork, id: string): StopDetails
                 bus_id: line.id,
                 lineName: line.name,
                 color: line.color,
+                textColor: line.textColor,
+                mode: line.mode,
                 direction: dir.direction,
                 headsign: dir.headsign,
-                estimated: dir.estimated,
                 times: [...times].sort((a, b) => a - b).map(formatTime),
             });
         }
@@ -66,19 +67,49 @@ export function getStopDetails(network: TransitNetwork, id: string): StopDetails
     return { ...toStopSummary(stop), passingLines };
 }
 
-export function getDepartures(network: TransitNetwork, id: string, after: number, limit: number) {
+/**
+ * Next departures, with real-time predictions. Departures of every stop point
+ * of the place (both sides of the street) are included when `area` is set.
+ */
+export async function getDepartures(network: TransitNetwork, id: string, after: number, limit: number, area = false) {
     const stop = requireStop(network, id);
-    const departures: Departure[] = network.departures(stop.index, after, limit).map(({ trip, time }) => {
-        const line = network.lines.get(trip.line)!;
-        return {
-            line: line.id,
-            lineName: line.name,
-            color: line.color,
-            direction: trip.direction,
-            headsign: trip.headsign,
-            time: formatTime(time),
-            estimated: trip.estimated,
-        };
-    });
-    return { stop: toStopSummary(stop), time: formatTime(after), departures };
+    const stops = area ? network.stopArea(stop) : [stop];
+    const updates = await tripUpdatesOrNull();
+    // Late vehicles scheduled a bit earlier may still be to come.
+    const LOOKBACK = 15;
+    const candidates = stops.flatMap(s => network.departures(s.index, after - LOOKBACK, limit * 3 + 10));
+
+    const departures = candidates
+        .map(({ trip, position, time }) => {
+            const line = network.lines.get(trip.line)!;
+            const delays = tripDelays(network, updates, trip);
+            const delay = delays?.stops[position].delay ?? null;
+            const skipped = delays?.stops[position].skipped ?? false;
+            const expected = time + (delay ?? 0) / 60;
+            const departure: Departure = {
+                tripId: trip.id,
+                line: line.id,
+                lineName: line.name,
+                color: line.color,
+                textColor: line.textColor,
+                mode: line.mode,
+                direction: trip.direction,
+                headsign: trip.headsign,
+                time: formatTime(time),
+                realtime: delay === null ? null : { time: expectedTime(time, delay), delay },
+                cancelled: (delays?.cancelled ?? false) || skipped,
+            };
+            return { departure, expected, stopId: network.stops[trip.stops[position]].id };
+        })
+        .filter(d => d.expected >= after)
+        .sort((a, b) => a.expected - b.expected)
+        .slice(0, limit);
+
+    return {
+        stop: toStopSummary(stop),
+        serviceDate: network.serviceDate,
+        time: formatTime(after),
+        realtime: updates !== null,
+        departures: departures.map(d => ({ ...d.departure, stopPointId: d.stopId })),
+    };
 }

@@ -1,0 +1,3 @@
+route_id,agency_id,route_short_name,route_long_name,route_type,route_color,route_text_color,route_sort_order
+0001,1,1,"Alpha - Charlie",3,003893,FFFFFF,1
+M8,1,8M,"Bravo - Echo, par la mer",4,9AAAD7,000000,2

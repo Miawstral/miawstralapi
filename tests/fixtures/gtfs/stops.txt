@@ -1,0 +1,6 @@
+stop_id,stop_name,stop_lat,stop_lon,location_type,wheelchair_boarding
+TOALPH,Alpha,43.1000,5.9000,0,1
+TOBRAV,"Bravo",43.1000,5.9100,0,1
+TOBRAW,"Bravo",43.1001,5.9101,0,1
+SECHAR,Charlie,43.1000,5.9200,0,0
+SEECHO,Echo,43.1200,5.9100,0,1

@@ -1,3 +1,5 @@
+import type { ServiceAlert, TransitMode } from './BusData';
+
 export interface Location {
     lat?: number;
     lon?: number;
@@ -12,6 +14,8 @@ export interface RouteRequest {
     maxWalkingDistance?: number;
     /** Maximum number of transfers (default 2, max 4). */
     maxTransfers?: number;
+    /** Service day, YYYY-MM-DD (default: today). */
+    date?: string;
     /** Format HH:MM, defaults to the current time (Europe/Paris). */
     departureTime?: string;
     /** Format HH:MM: arrive before this time instead (latest departures first). */
@@ -56,9 +60,12 @@ export interface StopCall {
 
 export interface BusStep {
     type: 'bus';
+    tripId: string;
     line: string;
     lineName: string;
     color: string;
+    textColor: string;
+    mode: TransitMode;
     /** Terminus of the trip. */
     headsign: string;
     from: { stopId: string; name: string; lat: number; lon: number };
@@ -73,8 +80,10 @@ export interface BusStep {
     duration: number;
     /** Meters. */
     distance: number;
-    /** True when the schedule of this direction was estimated (see LineDirectionSummary.estimated). */
-    estimated: boolean;
+    /** Real-time prediction of the vehicle, when tracked. */
+    realtime: { departureTime: string; arrivalTime: string; departureDelay: number; arrivalDelay: number } | null;
+    /** The trip was cancelled (real-time). */
+    cancelled: boolean;
     geometry?: [number, number][];
 }
 
@@ -88,8 +97,9 @@ export interface RouteOption {
     transfers: number;
     /** Meters. */
     walkingDistance: number;
-    estimated: boolean;
     steps: RouteStep[];
+    /** Ids of the service alerts concerning the lines used. */
+    alerts: string[];
     /** Lower is better: duration plus a penalty per transfer. */
     score: number;
 }
@@ -97,10 +107,13 @@ export interface RouteOption {
 export interface RouteResponse {
     from: Place;
     to: Place;
+    serviceDate: string;
     departureTime: string;
     /** Set for arrive-by searches. */
     arrivalTime?: string;
     routes: RouteOption[];
+    /** Alerts referenced by the routes. */
+    alerts: ServiceAlert[];
     warnings: string[];
     /** Milliseconds. */
     calculationTime: number;

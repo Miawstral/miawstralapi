@@ -61,3 +61,12 @@ export function optionalStringList(value: unknown, name: string): string[] | und
     }
     return list.map(v => String(v).trim()).filter(Boolean);
 }
+
+/** "YYYY-MM-DD", checked against the calendar. */
+export function optionalDate(value: unknown, name: string): string | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T12:00:00Z`))) {
+        throw badRequest(`'${name}' must be a date formatted YYYY-MM-DD`);
+    }
+    return value;
+}

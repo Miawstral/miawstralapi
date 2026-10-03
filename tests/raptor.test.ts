@@ -1,9 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { RawLineFileV1 } from '../src/interfaces/BusData';
-import { TransitNetwork } from '../src/network/network';
+import type { TransitNetwork } from '../src/network/network';
 import { planJourneys, PlanRequest } from '../src/routing/planner';
-import { raptor, RaptorQuery } from '../src/routing/raptor';
-import { line, minutes, network, stop } from './helpers';
+import { raptor, RaptorQuery, reachability } from '../src/routing/raptor';
+import { line, minutes, network, stop, trip } from './helpers';
 
 /*
  *  G ──3──────────── F          Line 1: A → B → C → D        (7:00, 7:20)
@@ -13,20 +12,16 @@ import { line, minutes, network, stop } from './helpers';
  *  A ──1── B ──1──── C ──1── D H ──4── I
  */
 function buildNetwork(): TransitNetwork {
-    return network([
-        line('1', [
-            stop('A', 0, 0, ['7:00', '7:20']),
-            stop('B', 1, 0, ['7:03', '7:23']),
-            stop('C', 2, 0, ['7:06', '7:26']),
-            stop('D', 3, 0, ['7:09', '7:29']),
-        ]),
+    const stops = [stop('A', 0, 0), stop('B', 1, 0), stop('C', 2, 0), stop('D', 3, 0), stop('E', 2, 1), stop('F', 2, 2), stop('G', 0, 2), stop('H', 3.1, 0), stop('I', 4, 0)];
+    return network(stops, [
+        line('1', [trip('1a', ['A', 'B', 'C', 'D'], ['7:00', '7:03', '7:06', '7:09']), trip('1b', ['A', 'B', 'C', 'D'], ['7:20', '7:23', '7:26', '7:29'])]),
         line('2', [
-            stop('C', 2, 0, ['7:08', '7:12', '7:30']),
-            stop('E', 2, 1, ['7:11', '7:15', '7:33']),
-            stop('F', 2, 2, ['7:14', '7:18', '7:36']),
+            trip('2a', ['C', 'E', 'F'], ['7:08', '7:11', '7:14']),
+            trip('2b', ['C', 'E', 'F'], ['7:12', '7:15', '7:18']),
+            trip('2c', ['C', 'E', 'F'], ['7:30', '7:33', '7:36']),
         ]),
-        line('3', [stop('A', 0, 0, ['7:01']), stop('G', 0, 2, ['7:15']), stop('F', 2, 2, ['7:30'])]),
-        line('4', [stop('H', 3.1, 0, ['7:15']), stop('I', 4, 0, ['7:20'])]),
+        line('3', [trip('3a', ['A', 'G', 'F'], ['7:01', '7:15', '7:30'])]),
+        line('4', [trip('4a', ['H', 'I'], ['7:15', '7:20'])]),
     ]);
 }
 
@@ -59,20 +54,15 @@ describe('TransitNetwork', () => {
         expect(net.footpaths[at('A')]).toEqual([]);
     });
 
-    it('mirrors the missing direction of legacy files only', () => {
-        expect(network([line('1', [stop('A', 0, 0, ['7:00']), stop('B', 1, 0, ['7:03'])])], true).getLine('1')!.directions).toHaveLength(1);
-        const legacy: RawLineFileV1 = {
-            bus_id: '1',
-            lineName: 'Line 1',
-            direction: 'OUTWARD',
-            lineId: null,
-            notes: [],
-            stops: [stop('A', 0, 0, ['7:00']), stop('B', 1, 0, ['7:03'])],
-        };
-        const estimated = new TransitNetwork([legacy], { estimateMissingDirections: true });
-        const inward = estimated.getLine('1')!.directions[1];
-        expect(inward).toMatchObject({ direction: 'INWARD', estimated: true, headsign: 'A' });
-        expect(inward.trips[0].stops.map(s => estimated.stops[s].id)).toEqual(['B', 'A']);
+    it('groups trips by line and direction', () => {
+        const two = net.getLine('2')!;
+        expect(two.directions.map(d => [d.direction, d.headsign, d.trips.length])).toEqual([['OUTWARD', 'F', 3]]);
+        expect(net.patterns.filter(p => p.line === '2')).toHaveLength(1);
+        expect(net.trips.get('2b')!.times).toEqual([minutes('7:12'), minutes('7:15'), minutes('7:18')]);
+    });
+
+    it('accepts the stop ids of the 1.x API', () => {
+        expect(net.getStop('MISTRAL:A')?.id).toBe('A');
     });
 
     it('lists the next departures, excluding the terminus', () => {
@@ -87,13 +77,9 @@ describe('TransitNetwork', () => {
     });
 
     it('searches stops without accents, prefix first', () => {
-        const n = network([
-            line('9', [stop('X', 0, 0, ['7:00']), stop('Y', 1, 0, ['7:05'])]),
+        const n = network([{ ...stop('X', 0, 0), name: 'Place de la Liberté' }, { ...stop('Y', 1, 0), name: 'Liberté' }], [
+            line('9', [trip('9a', ['X', 'Y'], ['7:00', '7:05'])]),
         ]);
-        n.stops[0].name = 'Place de la Liberté';
-        n.stops[0].searchKey = 'place de la liberte';
-        n.stops[1].name = 'Liberté';
-        n.stops[1].searchKey = 'liberte';
         expect(n.searchStops('LIBERTE').map(s => s.name)).toEqual(['Liberté', 'Place de la Liberté']);
     });
 });
@@ -137,6 +123,23 @@ describe('raptor', () => {
         expect(summary(query('A', 'D', '7:21'))).toEqual([]);
     });
 
+    it('boards and alights only at accessible stops when asked to', () => {
+        const n = network([stop('A', 0, 0), stop('B', 1, 0, false), stop('C', 2, 0)], [
+            line('1', [trip('1a', ['A', 'B', 'C'], ['7:00', '7:05', '7:10'])]),
+        ]);
+        const at = (id: string) => n.getStop(id)!.index;
+        const q = (to: string) => ({ departure: minutes('6:50'), access: [{ stop: at('A'), duration: 0, distance: 0 }], egress: [{ stop: at(to), duration: 0, distance: 0 }], maxTransfers: 0, accessibleOnly: true });
+        expect(raptor(n, q('C'))).toHaveLength(1); // rides through B
+        expect(raptor(n, q('B'))).toHaveLength(0);
+    });
+
+    it('computes the earliest arrival everywhere', () => {
+        const reach = reachability(net, { departure: minutes('6:50'), access: [{ stop: at('A'), duration: 0, distance: 0 }], maxTransfers: 2 });
+        expect(reach.arrival[at('F')]).toBe(minutes('7:14'));
+        expect(reach.rides[at('F')]).toBe(2);
+        expect(reach.arrival[at('A')]).toBe(minutes('6:50'));
+    });
+
     it('leaves the origin just in time for the first vehicle', () => {
         const [journey] = raptor(net, {
             ...query('A', 'D', '6:30'),
@@ -177,9 +180,20 @@ describe('planJourneys', () => {
             departureTime: '07:00',
             arrivalTime: '07:06',
             stopsCount: 2,
-            estimated: false,
+            cancelled: false,
+            realtime: null,
         });
         expect(first.type === 'bus' && first.intermediateStops.map(s => [s.name, s.time])).toEqual([['B', '07:03']]);
+    });
+
+    it('arrives before a time, latest departures first', async () => {
+        const result = await planJourneys(net, request({ arriveBy: minutes('7:35') }));
+        expect(result.arrivalTime).toBe('07:35');
+        expect(result.routes.map(r => [r.departureTime, r.arrivalTime])).toEqual([
+            ['07:01', '07:30'],
+            ['07:00', '07:14'],
+        ]);
+        expect(result.routes.every(r => r.arrivalTime <= '07:35')).toBe(true);
     });
 
     it('walks to and from coordinates', async () => {

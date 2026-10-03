@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Downloads the OpenStreetMap extract of the region, keeps the Toulon area and
-# builds the OSRM graphs (MLD) for the foot and car profiles in /data/<profile>.
+# builds the OSRM walking graph (MLD) in /data/foot.
 # Runs once: later starts exit immediately while the settings are unchanged.
 set -euo pipefail
 
@@ -9,7 +9,7 @@ DATA_DIR=${DATA_DIR:-/data}
 OSM_URL=${OSM_URL:-https://download.openstreetmap.fr/extracts/europe/france/provence_alpes_cote_d_azur/var-latest.osm.pbf}
 # lon_min,lat_min,lon_max,lat_max: every stop of the network plus a margin
 OSM_BBOX=${OSM_BBOX:-5.75,42.99,6.24,43.22}
-PROFILES=(foot car)
+PROFILES=(foot)
 
 stamp="$DATA_DIR/.prepared"
 wanted="$OSM_URL|$OSM_BBOX|${PROFILES[*]}"

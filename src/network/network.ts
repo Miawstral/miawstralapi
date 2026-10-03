@@ -1,18 +1,64 @@
-import type { Direction, RawLineFile, RawStop } from '../interfaces/BusData';
+import type { Direction } from '../interfaces/BusData';
 import { estimateWalk, haversine } from '../lib/geo';
 import { normalizeText } from '../lib/text';
-import { MINUTES_PER_DAY, parseTime } from '../lib/time';
-import { compareLineIds, getLineColor } from './line-colors';
-import { buildTripsFromColumns, buildTripsFromRows, mirrorTrip, TimetableRow, TripDraft } from './trip-builder';
+import { MINUTES_PER_DAY } from '../lib/time';
+import type { TransitMode } from '../gtfs/feed';
+import { compareLineIds } from './line-colors';
 
-export interface NetworkStop {
-    index: number;
+/**
+ * In-memory model of the network for one service day: stops, lines, trips,
+ * RAPTOR patterns and walking transfers. Built from a `NetworkSource` (see
+ * gtfs/source.ts) and immutable afterwards.
+ */
+
+export interface SourceStop {
     id: string;
     name: string;
     city: string | null;
     lat: number;
     lon: number;
     accessible: boolean;
+}
+
+export interface SourceTrip {
+    id: string;
+    direction: Direction;
+    headsign: string;
+    stops: string[];
+    /** Minutes after midnight of the service day, non-decreasing. */
+    times: number[];
+    shapeId: string | null;
+    /** Distance along the shape of each stop, when known. */
+    distances: number[] | null;
+}
+
+export interface SourceLine {
+    id: string;
+    routeId: string;
+    name: string;
+    color: string;
+    textColor: string;
+    mode: TransitMode;
+    sortOrder: number;
+    trips: SourceTrip[];
+}
+
+export interface Shape {
+    points: [number, number][];
+    distances: number[];
+}
+
+export interface NetworkSource {
+    /** YYYY-MM-DD. */
+    serviceDate: string;
+    stops: SourceStop[];
+    lines: SourceLine[];
+    shapes: Map<string, Shape>;
+    feedVersion: string | null;
+}
+
+export interface NetworkStop extends SourceStop {
+    index: number;
     /** Lines serving the stop, sorted. */
     lines: string[];
     /** Normalized name for search. */
@@ -24,10 +70,10 @@ export interface Trip {
     line: string;
     direction: Direction;
     headsign: string;
-    estimated: boolean;
     stops: number[];
-    /** Absolute minutes since midnight of the service day, non-decreasing. */
     times: number[];
+    shapeId: string | null;
+    distances: number[] | null;
 }
 
 /** Trips of a line sharing the exact same stop sequence (a RAPTOR "route"). */
@@ -35,7 +81,6 @@ export interface Pattern {
     index: number;
     line: string;
     direction: Direction;
-    estimated: boolean;
     stops: number[];
     /** Sorted by departure from the first stop. */
     trips: Trip[];
@@ -54,38 +99,33 @@ export interface Footpath {
 export interface LineDirection {
     direction: Direction;
     headsign: string;
-    estimated: boolean;
-    /** Ordered stops of the timetable (stop indices). */
+    /** Stops of the longest pattern of this direction. */
     stops: number[];
     trips: Trip[];
 }
 
 export interface NetworkLine {
     id: string;
+    routeId: string;
     name: string;
-    lineId: string | null;
     color: string;
-    notes: string[];
-    cachedAt: string | null;
-    /** Scraped in the legacy format (trips rebuilt by alignment, one direction). */
-    legacy: boolean;
+    textColor: string;
+    mode: TransitMode;
+    sortOrder: number;
     directions: LineDirection[];
 }
 
 export interface NetworkOptions {
-    /** Mirror the scraped direction of a line when the other one is missing. */
-    estimateMissingDirections?: boolean;
     /** Max straight-line distance between two stops for a walking transfer, in meters. */
     maxTransferDistance?: number;
 }
 
 export interface DepartureAtStop {
     trip: Trip;
-    /** Minutes, may be negative or exceed 24:00 relative to the query day. */
+    position: number;
+    /** Minutes, relative to the service day (may exceed 24:00). */
     time: number;
 }
-
-const OPPOSITE: Record<Direction, Direction> = { OUTWARD: 'INWARD', INWARD: 'OUTWARD' };
 
 function mostFrequent(values: string[]): string {
     const counts = new Map<string, number>();
@@ -98,55 +138,83 @@ function mostFrequent(values: string[]): string {
     return best;
 }
 
-function normalizeDirection(value: string | null | undefined): Direction {
-    return value?.toUpperCase() === 'INWARD' ? 'INWARD' : 'OUTWARD';
-}
-
-/**
- * In-memory model of the network built from the timetable files: stops,
- * lines, trips, RAPTOR patterns and walking transfers. Immutable once built.
- */
 export class TransitNetwork {
+    readonly serviceDate: string;
+    readonly feedVersion: string | null;
     readonly stops: NetworkStop[] = [];
     readonly lines = new Map<string, NetworkLine>();
     readonly patterns: Pattern[] = [];
     /** For each stop, the patterns serving it and the stop position in the pattern. */
     readonly stopPatterns: { pattern: number; position: number }[][] = [];
     readonly footpaths: Footpath[][] = [];
-    readonly warnings: string[] = [];
+    readonly trips = new Map<string, Trip>();
+    readonly shapes: Map<string, Shape>;
     readonly loadedAt = new Date();
 
     private readonly stopIndex = new Map<string, number>();
-    private readonly linesByStop: Set<string>[] = [];
-    private readonly options: Required<NetworkOptions>;
+    private readonly lineByRoute = new Map<string, NetworkLine>();
 
-    constructor(files: RawLineFile[], options: NetworkOptions = {}) {
-        this.options = {
-            estimateMissingDirections: options.estimateMissingDirections ?? true,
-            maxTransferDistance: options.maxTransferDistance ?? 300,
-        };
+    constructor(source: NetworkSource, options: NetworkOptions = {}) {
+        this.serviceDate = source.serviceDate;
+        this.feedVersion = source.feedVersion;
+        this.shapes = source.shapes;
 
-        const sorted = [...files].sort((a, b) => compareLineIds(a.bus_id, b.bus_id));
-        for (const file of sorted) this.addLine(file);
+        for (const stop of source.stops) {
+            this.stopIndex.set(stop.id, this.stops.length);
+            this.stops.push({ ...stop, index: this.stops.length, lines: [], searchKey: normalizeText(stop.name) });
+            this.footpaths.push([]);
+            this.stopPatterns.push([]);
+        }
+
+        const linesByStop = this.stops.map(() => new Set<string>());
+        const sorted = [...source.lines].sort((a, b) => a.sortOrder - b.sortOrder || compareLineIds(a.id, b.id));
+        for (const sourceLine of sorted) {
+            const trips: Trip[] = [];
+            for (const t of sourceLine.trips) {
+                const stops = t.stops.map(id => this.stopIndex.get(id));
+                if (stops.some(s => s === undefined)) continue;
+                const trip: Trip = { ...t, line: sourceLine.id, stops: stops as number[] };
+                trips.push(trip);
+                this.trips.set(trip.id, trip);
+                trip.stops.forEach(s => linesByStop[s].add(sourceLine.id));
+            }
+            if (trips.length === 0) continue;
+
+            const directions = (['OUTWARD', 'INWARD'] as Direction[]).flatMap((direction): LineDirection[] => {
+                const own = trips.filter(t => t.direction === direction);
+                if (own.length === 0) return [];
+                const longest = own.reduce((a, b) => (b.stops.length > a.stops.length ? b : a));
+                return [{ direction, headsign: mostFrequent(own.map(t => t.headsign)), stops: longest.stops, trips: own }];
+            });
+            const { trips: _, ...rest } = sourceLine;
+            const line: NetworkLine = { ...rest, directions };
+            this.lines.set(line.id, line);
+            this.lineByRoute.set(line.routeId, line);
+        }
 
         this.stops.forEach((stop, i) => {
-            stop.lines = [...this.linesByStop[i]].sort(compareLineIds);
+            stop.lines = [...linesByStop[i]].sort(compareLineIds);
         });
         this.buildPatterns();
-        this.buildFootpaths();
+        this.buildFootpaths(options.maxTransferDistance ?? 300);
     }
 
     get tripCount(): number {
-        return this.patterns.reduce((sum, p) => sum + p.trips.length, 0);
+        return this.trips.size;
     }
 
     getStop(id: string): NetworkStop | undefined {
-        const index = this.stopIndex.get(id);
+        // Ids of the 1.x API were prefixed ("MISTRAL:SECENN").
+        const index = this.stopIndex.get(id) ?? this.stopIndex.get(id.replace(/^MISTRAL:/, ''));
         return index === undefined ? undefined : this.stops[index];
     }
 
     getLine(id: string): NetworkLine | undefined {
-        return this.lines.get(id) ?? this.lines.get(id.toUpperCase());
+        return this.lines.get(id) ?? this.lines.get(id.toUpperCase()) ?? this.lineByRoute.get(id);
+    }
+
+    lineOfRoute(routeId: string): NetworkLine | undefined {
+        return this.lineByRoute.get(routeId);
     }
 
     /** Accent-insensitive search on stop names; prefix matches first. */
@@ -169,20 +237,6 @@ export class TransitNetwork {
         return scored.slice(0, limit).map(s => s.stop);
     }
 
-    /**
-     * The stop and the other stop points of the same place: same name and city,
-     * a few dozen meters apart (typically both sides of a street).
-     */
-    stopArea(stop: NetworkStop, maxDistance = 150): NetworkStop[] {
-        return this.stops.filter(
-            s =>
-                s === stop ||
-                (s.searchKey === stop.searchKey &&
-                    s.city === stop.city &&
-                    haversine(s.lat, s.lon, stop.lat, stop.lon) <= maxDistance),
-        );
-    }
-
     /** Stops within `radius` meters (straight line), nearest first. */
     nearbyStops(lat: number, lon: number, radius: number): { stop: NetworkStop; distance: number }[] {
         const result: { stop: NetworkStop; distance: number }[] = [];
@@ -194,18 +248,27 @@ export class TransitNetwork {
     }
 
     /**
-     * Next departures from a stop after `after` (minutes). Trips running after
-     * midnight are also matched at their time of day.
+     * The stop and the other stop points of the same place: same name and city,
+     * a few dozen meters apart (typically both sides of a street).
      */
+    stopArea(stop: NetworkStop, maxDistance = 150): NetworkStop[] {
+        return this.stops.filter(
+            s =>
+                s === stop ||
+                (s.searchKey === stop.searchKey && s.city === stop.city && haversine(s.lat, s.lon, stop.lat, stop.lon) <= maxDistance),
+        );
+    }
+
+    /** Departures from a stop after `after` (minutes), the terminus excluded. */
     departures(stopIndex: number, after: number, limit = 10): DepartureAtStop[] {
         const result: DepartureAtStop[] = [];
         for (const { pattern, position } of this.stopPatterns[stopIndex] ?? []) {
             const p = this.patterns[pattern];
-            if (position === p.stops.length - 1) continue; // terminus: nobody boards there
+            if (position === p.stops.length - 1) continue;
             for (const trip of p.trips) {
                 for (const shift of [0, -MINUTES_PER_DAY]) {
                     const time = trip.times[position] + shift;
-                    if (time >= after) result.push({ trip, time });
+                    if (time >= after) result.push({ trip, position, time });
                 }
             }
         }
@@ -214,107 +277,6 @@ export class TransitNetwork {
     }
 
     // -----------------------------------------------------------------------
-    // Construction
-    // -----------------------------------------------------------------------
-
-    private addStop(raw: RawStop, line: string): number | null {
-        const id = raw.stopPointId;
-        const lat = Number.parseFloat(raw.latitude ?? '');
-        const lon = Number.parseFloat(raw.longitude ?? '');
-        if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-
-        let index = this.stopIndex.get(id);
-        if (index === undefined) {
-            index = this.stops.length;
-            this.stops.push({
-                index,
-                id,
-                name: raw.name,
-                city: raw.city,
-                lat,
-                lon,
-                accessible: raw.accessible,
-                lines: [],
-                searchKey: normalizeText(raw.name),
-            });
-            this.stopIndex.set(id, index);
-            this.linesByStop.push(new Set());
-            this.footpaths.push([]);
-            this.stopPatterns.push([]);
-        }
-        this.linesByStop[index].add(line);
-        return index;
-    }
-
-    private addLine(file: RawLineFile): void {
-        const id = String(file.bus_id);
-        const isAligned = 'version' in file && file.version === 2;
-        const rawDirections = 'directions' in file
-            ? file.directions
-            : [{ direction: normalizeDirection(file.direction), stops: file.stops }];
-
-        const line: NetworkLine = {
-            id,
-            name: file.lineName ?? `Ligne ${id}`,
-            lineId: file.lineId,
-            color: getLineColor(id),
-            notes: file.notes ?? [],
-            cachedAt: file.cachedAt ?? null,
-            legacy: !isAligned,
-            directions: [],
-        };
-
-        for (const raw of rawDirections) {
-            const rows: TimetableRow[] = raw.stops.map(stop => ({
-                stop: this.addStop(stop, id),
-                times: stop.times.map(t => parseTime(t)),
-            }));
-            const skipped = raw.stops.length - rows.filter(r => r.stop !== null).length;
-            if (skipped > 0) this.warnings.push(`Line ${id} ${raw.direction}: ${skipped} stop(s) without id or coordinates ignored`);
-
-            const drafts = isAligned ? buildTripsFromColumns(rows) : buildTripsFromRows(rows);
-            if (drafts.length === 0) {
-                this.warnings.push(`Line ${id} ${raw.direction}: no usable trip`);
-                continue;
-            }
-            const stops = rows.map(r => r.stop).filter((s): s is number => s !== null);
-            line.directions.push(this.makeDirection(id, raw.direction, false, stops, drafts));
-        }
-
-        // Legacy files only hold one direction. In current files a single direction is a loop line.
-        if (this.options.estimateMissingDirections && !isAligned && line.directions.length === 1) {
-            const scraped = line.directions[0];
-            const drafts = scraped.trips.map(t => mirrorTrip({ stops: t.stops, times: t.times }));
-            line.directions.push(
-                this.makeDirection(id, OPPOSITE[scraped.direction], true, [...scraped.stops].reverse(), drafts),
-            );
-        }
-
-        if (line.directions.length > 0) this.lines.set(id, line);
-        else this.warnings.push(`Line ${id}: ignored, no usable timetable`);
-    }
-
-    private makeDirection(
-        line: string,
-        direction: Direction,
-        estimated: boolean,
-        stops: number[],
-        drafts: TripDraft[],
-    ): LineDirection {
-        const prefix = `${line}:${direction[0]}`;
-        const trips = drafts
-            .sort((a, b) => a.times[0] - b.times[0])
-            .map((draft, i): Trip => ({
-                id: `${prefix}:${i}`,
-                line,
-                direction,
-                headsign: this.stops[draft.stops[draft.stops.length - 1]].name,
-                estimated,
-                stops: draft.stops,
-                times: draft.times,
-            }));
-        return { direction, headsign: mostFrequent(trips.map(t => t.headsign)), estimated, stops, trips };
-    }
 
     private buildPatterns(): void {
         const byKey = new Map<string, Pattern>();
@@ -324,15 +286,7 @@ export class TransitNetwork {
                     const key = `${line.id}|${dir.direction}|${trip.stops.join(',')}`;
                     let pattern = byKey.get(key);
                     if (!pattern) {
-                        pattern = {
-                            index: this.patterns.length,
-                            line: line.id,
-                            direction: dir.direction,
-                            estimated: dir.estimated,
-                            stops: trip.stops,
-                            trips: [],
-                            fifo: true,
-                        };
+                        pattern = { index: this.patterns.length, line: line.id, direction: dir.direction, stops: trip.stops, trips: [], fifo: true };
                         byKey.set(key, pattern);
                         this.patterns.push(pattern);
                     }
@@ -340,32 +294,26 @@ export class TransitNetwork {
                 }
             }
         }
-
         for (const pattern of this.patterns) {
             pattern.trips.sort((a, b) => a.times[0] - b.times[0]);
-            pattern.fifo = pattern.trips.every((trip, i) =>
-                i === 0 || trip.times.every((t, pos) => t >= pattern.trips[i - 1].times[pos]),
-            );
-            pattern.stops.forEach((stop, position) => {
-                this.stopPatterns[stop].push({ pattern: pattern.index, position });
-            });
+            pattern.fifo = pattern.trips.every((trip, i) => i === 0 || trip.times.every((t, pos) => t >= pattern.trips[i - 1].times[pos]));
+            pattern.stops.forEach((stop, position) => this.stopPatterns[stop].push({ pattern: pattern.index, position }));
         }
     }
 
-    private buildFootpaths(): void {
-        const max = this.options.maxTransferDistance;
-        // Cheap bounding box filter before the haversine: 1° of latitude ≈ 111 km.
+    private buildFootpaths(max: number): void {
+        // Only stops actually served get transfers; a latitude-sorted sweep keeps it fast.
+        const served = this.stops.filter(s => s.lines.length > 0).sort((a, b) => a.lat - b.lat);
         const maxDeg = max / 111_000;
-        for (let i = 0; i < this.stops.length; i++) {
-            const a = this.stops[i];
+        for (let i = 0; i < served.length; i++) {
+            const a = served[i];
             const maxLonDeg = maxDeg / Math.cos((a.lat * Math.PI) / 180);
-            for (let j = i + 1; j < this.stops.length; j++) {
-                const b = this.stops[j];
-                if (Math.abs(a.lat - b.lat) > maxDeg || Math.abs(a.lon - b.lon) > maxLonDeg) continue;
-                if (haversine(a.lat, a.lon, b.lat, b.lon) > max) continue;
+            for (let j = i + 1; j < served.length && served[j].lat - a.lat <= maxDeg; j++) {
+                const b = served[j];
+                if (Math.abs(a.lon - b.lon) > maxLonDeg || haversine(a.lat, a.lon, b.lat, b.lon) > max) continue;
                 const { distance, duration } = estimateWalk(a.lat, a.lon, b.lat, b.lon);
-                this.footpaths[i].push({ to: j, duration, distance });
-                this.footpaths[j].push({ to: i, duration, distance });
+                this.footpaths[a.index].push({ to: b.index, duration, distance });
+                this.footpaths[b.index].push({ to: a.index, duration, distance });
             }
         }
     }

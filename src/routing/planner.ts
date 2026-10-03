@@ -1,8 +1,12 @@
+import type { ServiceAlert } from '../interfaces/BusData';
 import type { BusStep, Place, RouteOption, RouteResponse, RouteStep, StopCall, WalkStep } from '../interfaces/Route';
 import { estimateWalk, haversine, URBAN_DETOUR_FACTOR } from '../lib/geo';
 import { notFound } from '../lib/http-error';
 import { formatTime } from '../lib/time';
-import type { NetworkStop, TransitNetwork } from '../network/network';
+import type { NetworkStop, TransitNetwork, Trip } from '../network/network';
+import { sliceShape } from '../network/shapes';
+import { expectedTime, serviceAlerts, tripDelays, tripUpdatesOrNull } from '../realtime/enrich';
+import type { RtTripUpdate } from '../realtime/realtime.service';
 import { LatLon, roadPath } from './geometry';
 import { Journey, raptor, StopAccess } from './raptor';
 
@@ -113,7 +117,30 @@ function walkStep(from: Place, to: Place, departure: number, duration: number, d
     };
 }
 
-function toRouteOption(network: TransitNetwork, journey: Journey, from: Place, to: Place): RouteOption {
+/** Path of a ride: the official shape between the two stops, or the stops themselves. */
+function rideGeometry(network: TransitNetwork, trip: Trip, boardPos: number, alightPos: number, calls: StopCall[]): LatLon[] {
+    const shape = trip.shapeId ? network.shapes.get(trip.shapeId) : undefined;
+    if (shape && trip.distances) {
+        const points = sliceShape(shape, trip.distances[boardPos], trip.distances[alightPos]);
+        if (points.length >= 2) return points;
+    }
+    return calls.map(c => [c.lat, c.lon]);
+}
+
+function pathLength(points: LatLon[]): number {
+    let length = 0;
+    for (let i = 1; i < points.length; i++) length += haversine(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
+    return Math.round(length);
+}
+
+function toRouteOption(
+    network: TransitNetwork,
+    journey: Journey,
+    from: Place,
+    to: Place,
+    updates: Map<string, RtTripUpdate> | null,
+    alerts: ServiceAlert[],
+): RouteOption {
     const steps: RouteStep[] = [];
 
     for (const leg of journey.legs) {
@@ -140,17 +167,20 @@ function toRouteOption(network: TransitNetwork, journey: Journey, from: Place, t
                 const stop = network.stops[stopIndex];
                 return { stopId: stop.id, name: stop.name, lat: stop.lat, lon: stop.lon, time: formatTime(trip.times[boardPos + i]) };
             });
-            let distance = 0;
-            for (let i = 1; i < calls.length; i++) {
-                distance += haversine(calls[i - 1].lat, calls[i - 1].lon, calls[i].lat, calls[i].lon);
-            }
+            const geometry = rideGeometry(network, trip, boardPos, alightPos, calls);
+            const delays = tripDelays(network, updates, trip);
+            const departureDelay = delays?.stops[boardPos].delay ?? null;
+            const arrivalDelay = delays?.stops[alightPos].delay ?? null;
             const first = calls[0];
             const last = calls[calls.length - 1];
             const step: BusStep = {
                 type: 'bus',
+                tripId: trip.id,
                 line: line.id,
                 lineName: line.name,
                 color: line.color,
+                textColor: line.textColor,
+                mode: line.mode,
                 headsign: trip.headsign,
                 from: { stopId: first.stopId, name: first.name, lat: first.lat, lon: first.lon },
                 to: { stopId: last.stopId, name: last.name, lat: last.lat, lon: last.lon },
@@ -159,25 +189,50 @@ function toRouteOption(network: TransitNetwork, journey: Journey, from: Place, t
                 stopsCount: alightPos - boardPos,
                 intermediateStops: calls.slice(1, -1),
                 duration: leg.arrival - leg.departure,
-                distance: Math.round(distance),
-                estimated: trip.estimated,
-                geometry: calls.map(c => [c.lat, c.lon]),
+                distance: pathLength(geometry),
+                realtime:
+                    departureDelay === null && arrivalDelay === null
+                        ? null
+                        : {
+                              departureTime: expectedTime(leg.departure, departureDelay ?? 0),
+                              arrivalTime: expectedTime(leg.arrival, arrivalDelay ?? departureDelay ?? 0),
+                              departureDelay: departureDelay ?? 0,
+                              arrivalDelay: arrivalDelay ?? departureDelay ?? 0,
+                          },
+                cancelled: delays?.cancelled ?? false,
+                geometry,
             };
             steps.push(step);
         }
     }
 
+    mergeWalks(steps);
     const duration = journey.arrival - journey.departure;
+    const lines = new Set(steps.flatMap(s => (s.type === 'bus' ? [s.line] : [])));
     return {
         departureTime: formatTime(journey.departure),
         arrivalTime: formatTime(journey.arrival),
         duration,
         transfers: journey.transfers,
         walkingDistance: steps.reduce((sum, s) => sum + (s.type === 'walk' ? s.distance : 0), 0),
-        estimated: steps.some(s => s.type === 'bus' && s.estimated),
         steps,
+        alerts: alerts.filter(a => a.lines.some(l => lines.has(l.id))).map(a => a.id),
         score: duration + TRANSFER_PENALTY * journey.transfers,
     };
+}
+
+/** A walking transfer followed by the final walk (or the first walk then a transfer) is a single walk. */
+function mergeWalks(steps: RouteStep[]): void {
+    for (let i = steps.length - 1; i > 0; i--) {
+        const [a, b] = [steps[i - 1], steps[i]];
+        if (a.type !== 'walk' || b.type !== 'walk') continue;
+        steps.splice(i - 1, 2, {
+            ...walkStep(a.from, b.to, 0, a.duration + b.duration, a.distance + b.distance),
+            departureTime: a.departureTime,
+            arrivalTime: b.arrivalTime,
+            geometry: [...(a.geometry ?? []), ...(b.geometry ?? []).slice(1)],
+        });
+    }
 }
 
 function walkOnlyOption(from: Place, to: Place, departure: number): RouteOption {
@@ -188,19 +243,20 @@ function walkOnlyOption(from: Place, to: Place, departure: number): RouteOption 
         duration,
         transfers: 0,
         walkingDistance: distance,
-        estimated: false,
         steps: [walkStep(from, to, departure, duration, distance)],
+        alerts: [],
         score: duration,
     };
 }
 
-/** Replaces straight lines by OSRM street paths when available. */
+/** Walking paths from OSRM when available (rides already follow the official shapes). */
 async function addGeometry(routes: RouteOption[]): Promise<void> {
     const tasks: Promise<void>[] = [];
     for (const route of routes) {
         for (const step of route.steps) {
+            if (step.type !== 'walk') continue;
             const points = (step.geometry ?? []) as LatLon[];
-            const profile = step.type === 'walk' ? 'foot' : 'car';
+            const profile = 'foot';
             tasks.push(
                 roadPath(profile, points).then(path => {
                     if (!path) return;
@@ -221,12 +277,14 @@ export async function planJourneys(network: TransitNetwork, request: PlanRequest
     const from = resolvePlace(network, request.from);
     const to = resolvePlace(network, request.to);
     const warnings: string[] = [];
-    const response = (routes: RouteOption[]): RouteResponse => ({
+    const response = (routes: RouteOption[], alerts: ServiceAlert[] = []): RouteResponse => ({
         from,
         to,
+        serviceDate: network.serviceDate,
         departureTime: formatTime(request.departure),
         ...(request.arriveBy === undefined ? {} : { arrivalTime: formatTime(request.arriveBy) }),
         routes,
+        alerts,
         warnings,
         calculationTime: Date.now() - started,
     });
@@ -284,7 +342,8 @@ export async function planJourneys(network: TransitNetwork, request: PlanRequest
     // A bus journey slower than walking the whole way is pointless.
     if (walkOnly) journeys = journeys.filter(j => j.arrival - j.departure < walkOnly.duration);
 
-    const candidates = journeys.map(j => ({ ...j, build: () => toRouteOption(network, j, from, to) }));
+    const [updates, alerts] = await Promise.all([tripUpdatesOrNull(), serviceAlerts(network, false)]);
+    const candidates = journeys.map(j => ({ ...j, build: () => toRouteOption(network, j, from, to, updates, alerts) }));
     if (walkOnly) {
         const departure = request.arriveBy === undefined ? request.departure : request.arriveBy - walkOnly.duration;
         candidates.push({ legs: [], departure, arrival: departure + walkOnly.duration, transfers: 0, build: () => walkOnly });
@@ -301,12 +360,11 @@ export async function planJourneys(network: TransitNetwork, request: PlanRequest
     if (routes.length === 0 && warnings.length === 0) {
         warnings.push('Aucun itinéraire trouvé pour cet horaire. Essayez une autre heure ou plus de correspondances.');
     }
-    if (routes.some(r => r.estimated)) {
-        warnings.push(
-            'Certains horaires sont estimés : le sens retour de ces lignes n’a pas encore été récupéré et a été déduit du sens aller.',
-        );
+    if (routes.some(r => r.steps.some(s => s.type === 'bus' && s.cancelled))) {
+        warnings.push('Une course de ces itinéraires est annoncée supprimée : vérifiez les autres propositions.');
     }
 
     if (request.includeGeometry) await addGeometry(routes);
-    return response(routes);
+    const used = new Set(routes.flatMap(r => r.alerts));
+    return response(routes, alerts.filter(a => used.has(a.id)));
 }

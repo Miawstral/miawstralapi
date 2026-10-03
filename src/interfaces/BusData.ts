@@ -1,61 +1,9 @@
 /**
- * On-disk formats of the timetable files stored in DATA_DIR, and the
- * stop/line shapes returned by the public API.
+ * Stop, line and real-time shapes returned by the public API.
  */
 
 export type Direction = 'OUTWARD' | 'INWARD';
-
-/** A stop row of a scraped timetable. */
-export interface RawStop {
-    name: string;
-    city: string | null;
-    latitude: string | null;
-    longitude: string | null;
-    stopPointId: string | null;
-    accessible: boolean;
-    /**
-     * Passing times ("H:MM").
-     * - v2 files: one entry per trip column, `null` when the trip skips the stop.
-     * - v1 (legacy) files: only the served times, column alignment is lost.
-     */
-    times: (string | null)[];
-}
-
-/** Legacy format: one direction per file, times without placeholders. */
-export interface RawLineFileV1 {
-    version?: 1;
-    bus_id: string;
-    lineName: string | null;
-    direction: string | null;
-    lineId: string | null;
-    stops: RawStop[];
-    notes: string[];
-    cachedAt?: string;
-}
-
-export interface RawDirection {
-    direction: Direction;
-    stops: RawStop[];
-}
-
-/** Current format: both directions, trip columns preserved. */
-export interface RawLineFileV2 {
-    version: 2;
-    bus_id: string;
-    lineName: string | null;
-    lineId: string | null;
-    notes: string[];
-    cachedAt: string;
-    /** Day of the scraped timetable (YYYY-MM-DD). */
-    serviceDate?: string;
-    directions: RawDirection[];
-}
-
-export type RawLineFile = RawLineFileV1 | RawLineFileV2;
-
-// ---------------------------------------------------------------------------
-// API shapes
-// ---------------------------------------------------------------------------
+export type TransitMode = 'bus' | 'boat' | 'cable' | 'tram' | 'rail';
 
 export interface StopSummary {
     stopPointId: string;
@@ -64,7 +12,7 @@ export interface StopSummary {
     latitude: string;
     longitude: string;
     accessible: boolean;
-    /** Lines serving this stop (bus_id). */
+    /** Lines serving this stop on the service day (line ids). */
     lines: string[];
     /** Only set by /api/stops/nearby, in meters. */
     distance?: number;
@@ -75,38 +23,52 @@ export interface StopDetails extends StopSummary {
         bus_id: string;
         lineName: string;
         color: string;
+        textColor: string;
+        mode: TransitMode;
         direction: Direction;
         headsign: string;
-        estimated: boolean;
         /** Chronological passing times at this stop. */
         times: string[];
     }[];
 }
 
+export interface RealtimeInfo {
+    /** Expected time, "HH:MM". */
+    time: string;
+    /** Seconds, positive when late. */
+    delay: number;
+}
+
 export interface Departure {
+    tripId: string;
     line: string;
     lineName: string;
     color: string;
+    textColor: string;
+    mode: TransitMode;
     direction: Direction;
     headsign: string;
+    /** Scheduled time, "HH:MM". */
     time: string;
-    estimated: boolean;
+    /** Real-time prediction when the trip is tracked. */
+    realtime: RealtimeInfo | null;
+    cancelled: boolean;
 }
 
 export interface LineDirectionSummary {
     direction: Direction;
     /** Name of the terminus. */
     headsign: string;
-    /** True when no timetable was scraped for this direction and it was mirrored from the other one. */
-    estimated: boolean;
     trips: number;
 }
 
 export interface LineSummary {
     bus_id: string;
     lineName: string;
-    lineId: string | null;
+    lineId: string;
     color: string;
+    textColor: string;
+    mode: TransitMode;
     directions: LineDirectionSummary[];
 }
 
@@ -116,7 +78,58 @@ export interface LineStop extends Omit<StopSummary, 'lines' | 'distance'> {
 }
 
 export interface LineDetails extends Omit<LineSummary, 'directions'> {
-    notes: string[];
-    cachedAt: string | null;
+    serviceDate: string;
     directions: (LineDirectionSummary & { stops: LineStop[] })[];
+}
+
+export interface LineShape {
+    bus_id: string;
+    color: string;
+    directions: {
+        direction: Direction;
+        headsign: string;
+        /** [lat, lon] points of the itinerary. */
+        coordinates: [number, number][];
+        stops: { stopPointId: string; name: string; lat: number; lon: number }[];
+    }[];
+}
+
+export interface Vehicle {
+    id: string;
+    label: string | null;
+    tripId: string | null;
+    line: string | null;
+    lineName: string | null;
+    color: string;
+    textColor: string;
+    mode: TransitMode;
+    headsign: string | null;
+    lat: number;
+    lon: number;
+    /** Degrees, clockwise from north. */
+    bearing: number | null;
+    /** km/h */
+    speed: number | null;
+    /** Seconds, positive when late. */
+    delay: number | null;
+    status: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO' | null;
+    nextStop: { stopPointId: string; name: string } | null;
+    /** ISO date of the position. */
+    updatedAt: string | null;
+}
+
+export interface ServiceAlert {
+    id: string;
+    title: string;
+    description: string;
+    url: string | null;
+    cause: string | null;
+    effect: string | null;
+    /** ISO dates. */
+    start: string | null;
+    end: string | null;
+    /** Currently in effect (otherwise upcoming). */
+    active: boolean;
+    lines: { id: string; color: string; textColor: string }[];
+    stops: { stopPointId: string; name: string }[];
 }
