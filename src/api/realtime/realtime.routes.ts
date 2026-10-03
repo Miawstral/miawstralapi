@@ -24,9 +24,11 @@ router.get('/vehicles', async (req: Request, res: Response) => {
 
 /** GET /api/realtime/alerts?line=87 */
 router.get('/alerts', async (req: Request, res: Response) => {
-    const line = typeof req.query.line === 'string' ? req.query.line : null;
-    const alerts = await serviceAlerts(getNetwork());
-    res.set('Cache-Control', 'public, max-age=60');
+    const network = getNetwork();
+    const asked = typeof req.query.line === 'string' ? req.query.line : null;
+    const line = asked ? (network.getLine(asked)?.id ?? asked) : null;
+    const alerts = await serviceAlerts(network);
+    res.set('Cache-Control', 'public, max-age=120');
     res.json({ alerts: line ? alerts.filter(a => a.lines.some(l => l.id === line)) : alerts });
 });
 

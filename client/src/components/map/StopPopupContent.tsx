@@ -1,11 +1,12 @@
 import { useEffect, useEffectEvent } from 'react';
 import { Accessibility } from 'lucide-react';
-import { EstimatedBadge } from '@/components/common/EstimatedBadge';
+import { DelayBadge, LiveDot } from '@/components/common/RealtimeBadge';
 import { LineBadge, LineBadgeList } from '@/components/common/LineBadge';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { getDepartures } from '@/lib/api';
 import { formatTime, isValidTime } from '@/lib/format';
 import { sortLines } from '@/lib/text';
+import { cn } from '@/lib/utils';
 import type { LineSummary, StopSummary } from '@/types';
 import { PopupActions } from './PopupActions';
 
@@ -32,7 +33,7 @@ export function StopPopupContent({
 }: StopPopupContentProps) {
     const fromTime = isValidTime(time) ? time : undefined;
     const departures = useAsyncData(`${stop.stopPointId}@${fromTime ?? 'now'}`, (signal) =>
-        getDepartures(stop.stopPointId, fromTime, DEPARTURES_LIMIT, signal),
+        getDepartures(stop.stopPointId, { time: fromTime, limit: DEPARTURES_LIMIT }, signal),
     );
 
     const notifyLayout = useEffectEvent(onLayoutChange);
@@ -77,13 +78,24 @@ export function StopPopupContent({
                     ) : (
                         <ul className="scrollbar-thin -mx-1 max-h-44 overflow-y-auto">
                             {departures.data.departures.map((d, i) => (
-                                <li key={`${d.line}-${d.time}-${i}`} className="flex items-center gap-2 rounded-md px-1 py-1">
-                                    <time className="w-10 shrink-0 text-[13px] font-medium tnum">{formatTime(d.time)}</time>
-                                    <LineBadge line={d.line} color={d.color || linesById.get(d.line)?.color} title={d.lineName} />
+                                <li key={`${d.tripId}-${i}`} className={cn('flex items-center gap-2 rounded-md px-1 py-1', d.cancelled && 'opacity-60')}>
+                                    <time className={cn('w-10 shrink-0 text-[13px] font-medium tnum', d.cancelled && 'line-through')}>
+                                        {formatTime(d.realtime?.time ?? d.time)}
+                                    </time>
+                                    <LineBadge line={d.line} color={d.color} textColor={d.textColor} title={d.lineName} />
                                     <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={d.headsign}>
                                         {d.headsign}
                                     </span>
-                                    {d.estimated && <EstimatedBadge compact />}
+                                    {d.cancelled ? (
+                                        <span className="text-2xs font-medium text-danger">supprimé</span>
+                                    ) : (
+                                        d.realtime && (
+                                            <span className="flex items-center gap-1">
+                                                <LiveDot />
+                                                <DelayBadge delay={d.realtime.delay} />
+                                            </span>
+                                        )
+                                    )}
                                 </li>
                             ))}
                         </ul>

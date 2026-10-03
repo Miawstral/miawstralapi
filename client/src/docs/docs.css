@@ -1,0 +1,253 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * API documentation page. Same design tokens as the app (client/src/index.css),
+ * plus the code panels and the syntax highlighting colors.
+ */
+@layer base {
+    :root {
+        color-scheme: light;
+        --background: 0 0% 100%;
+        --surface: 0 0% 100%;
+        --subtle: 240 5% 97.5%;
+        --foreground: 240 10% 4%;
+        --muted: 240 5% 95.5%;
+        --muted-foreground: 240 4% 44%;
+        --accent: 240 5% 94%;
+        --accent-foreground: 240 6% 10%;
+        --border: 240 6% 90%;
+        --input: 240 6% 88%;
+        --ring: 240 6% 10%;
+        --primary: 240 6% 10%;
+        --primary-foreground: 0 0% 98%;
+        --brand: 221 83% 53%;
+        --warning: 32 95% 40%;
+        --danger: 0 72% 46%;
+        --success: 152 70% 34%;
+        --radius: 0.625rem;
+
+        /* Code panels stay dark in both themes. */
+        --code-bg: 240 6% 7%;
+        --code-header: 240 5% 10%;
+        --code-border: 240 4% 16%;
+        --code-fg: 240 5% 86%;
+        --code-muted: 240 4% 52%;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            color-scheme: dark;
+            --background: 240 6% 6%;
+            --surface: 240 6% 8%;
+            --subtle: 240 5% 10%;
+            --foreground: 0 0% 96%;
+            --muted: 240 4% 13%;
+            --muted-foreground: 240 5% 62%;
+            --accent: 240 4% 15%;
+            --accent-foreground: 0 0% 96%;
+            --border: 240 4% 17%;
+            --input: 240 4% 20%;
+            --ring: 0 0% 90%;
+            --primary: 0 0% 96%;
+            --primary-foreground: 240 6% 8%;
+            --brand: 217 91% 64%;
+            --warning: 38 92% 58%;
+            --danger: 0 84% 66%;
+            --success: 152 60% 52%;
+
+            --code-bg: 240 6% 8.5%;
+            --code-header: 240 5% 11%;
+            --code-border: 240 4% 18%;
+        }
+    }
+
+    * {
+        @apply border-border;
+    }
+
+    html {
+        -webkit-text-size-adjust: 100%;
+        /* No layout shift when a dialog locks the scroll. */
+        scrollbar-gutter: stable;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        html {
+            scroll-behavior: smooth;
+        }
+    }
+
+    body {
+        @apply bg-background font-sans text-foreground antialiased;
+        font-feature-settings: 'ss01', 'cv11';
+        text-rendering: optimizeLegibility;
+    }
+
+    :focus-visible {
+        outline: 2px solid hsl(var(--brand) / 0.9);
+        outline-offset: 2px;
+    }
+
+    .tnum {
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+@layer components {
+    .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: hsl(var(--border)) transparent;
+    }
+
+    .code-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: hsl(var(--code-border)) transparent;
+    }
+
+    /* Panels that keep a dark background whatever the theme. */
+    .code-panel {
+        background: hsl(var(--code-bg));
+        color: hsl(var(--code-fg));
+        box-shadow:
+            0 0 0 1px hsl(var(--code-border)),
+            0 1px 2px rgb(0 0 0 / 0.08),
+            0 12px 32px -12px rgb(0 0 0 / 0.35);
+    }
+
+    .code-panel :focus-visible {
+        outline-color: hsl(217 91% 64%);
+    }
+
+    /* Hero backdrop: faint grid fading out, and a glow of the brand color. */
+    .hero-grid {
+        background-image:
+            linear-gradient(to right, hsl(var(--border) / 0.7) 1px, transparent 1px),
+            linear-gradient(to bottom, hsl(var(--border) / 0.7) 1px, transparent 1px);
+        background-size: 44px 44px;
+        mask-image: radial-gradient(ellipse 70% 60% at 30% 0%, #000 30%, transparent 75%);
+        -webkit-mask-image: radial-gradient(ellipse 70% 60% at 30% 0%, #000 30%, transparent 75%);
+    }
+
+    .hero-glow {
+        background:
+            radial-gradient(40rem 20rem at 15% -10%, hsl(var(--brand) / 0.16), transparent 70%),
+            radial-gradient(30rem 16rem at 90% 0%, hsl(190 90% 50% / 0.08), transparent 70%);
+    }
+}
+
+@layer utilities {
+    .text-balance {
+        text-wrap: balance;
+    }
+
+    .text-pretty {
+        text-wrap: pretty;
+    }
+}
+
+/* Syntax highlighting (on the dark code panels). Outside of the layers: the
+ * class names are built at runtime (tok-${type}), Tailwind must keep them. */
+.tok-key {
+    color: #9ecbff;
+}
+.tok-string {
+    color: #a5e3b5;
+}
+.tok-number {
+    color: #f9c28b;
+}
+.tok-literal {
+    color: #f29db1;
+}
+.tok-keyword {
+    color: #c4a7ff;
+}
+.tok-function {
+    color: #8fd3ff;
+}
+.tok-type {
+    color: #ffd479;
+}
+.tok-comment {
+    color: hsl(var(--code-muted));
+    font-style: italic;
+}
+.tok-flag {
+    color: #8fd3ff;
+}
+.tok-command {
+    color: #c4a7ff;
+}
+.tok-variable {
+    color: #ffb0d9;
+}
+.tok-punct {
+    color: hsl(240 4% 62%);
+}
+.tok-method {
+    color: #6ee7b7;
+    font-weight: 600;
+}
+.tok-header {
+    color: #9ecbff;
+}
+
+/* The live dot: a ring that expands and fades. */
+@keyframes docs-pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.55;
+    }
+    80%,
+    100% {
+        transform: scale(2.6);
+        opacity: 0;
+    }
+}
+
+.live-dot {
+    position: relative;
+    display: inline-flex;
+    height: 0.5rem;
+    width: 0.5rem;
+    flex: none;
+    border-radius: 9999px;
+    background: currentColor;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .live-dot::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: currentColor;
+        animation: docs-pulse 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    .reveal {
+        animation: rise-in 420ms cubic-bezier(0.2, 0, 0, 1) both;
+    }
+}
+
+@keyframes rise-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (forced-colors: active) {
+    .code-panel {
+        border: 1px solid CanvasText;
+    }
+}

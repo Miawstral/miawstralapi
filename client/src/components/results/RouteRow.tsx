@@ -1,5 +1,5 @@
-import { ChevronRight } from 'lucide-react';
-import { EstimatedBadge } from '@/components/common/EstimatedBadge';
+import { ChevronRight, TriangleAlert } from 'lucide-react';
+import { RealtimeBadge } from '@/components/common/RealtimeBadge';
 import { formatDistance, formatDuration, formatTime, formatTransfers } from '@/lib/format';
 import { isWalkOnly, TAG_LABELS, type RouteTag } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,7 @@ interface RouteRowProps {
 
 export function RouteRow({ route, tags, selected, leavesIn, onOpen, onPreview, index }: RouteRowProps) {
     const walkOnly = isWalkOnly(route);
+    const firstRide = route.steps.find(s => s.type === 'bus');
     const meta = [
         leavesIn === null ? null : leavesIn === 0 ? 'Départ maintenant' : `Départ dans ${formatDuration(leavesIn)}`,
         walkOnly ? null : formatTransfers(route.transfers),
@@ -67,7 +68,14 @@ export function RouteRow({ route, tags, selected, leavesIn, onOpen, onPreview, i
                         {item}
                     </span>
                 ))}
-                {route.estimated && <EstimatedBadge className="ml-0.5" />}
+                {firstRide?.realtime && <RealtimeBadge delay={firstRide.realtime.departureDelay} className="ml-0.5" />}
+                {firstRide?.cancelled && <span className="font-medium text-danger">Course supprimée</span>}
+                {route.alerts.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-warning" title="Perturbation sur une ligne de ce trajet">
+                        <TriangleAlert className="h-3 w-3" aria-hidden="true" />
+                        Info trafic
+                    </span>
+                )}
             </span>
         </button>
     );

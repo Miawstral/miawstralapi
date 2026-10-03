@@ -1,10 +1,16 @@
 import type {
     ApiErrorBody,
+    DataStatus,
     DeparturesResponse,
+    IsochroneResponse,
+    LineDetails,
+    LineShape,
     LineSummary,
     RouteRequest,
     RouteResponse,
+    ServiceAlert,
     StopSummary,
+    VehiclesResponse,
 } from '@/types';
 
 /** Base URL of the backend. Empty string = same origin (the Vite dev server proxies `/api`). */
@@ -124,15 +130,14 @@ export function getNearbyStops(
     });
 }
 
-/** Next departures at a stop from `time` ("HH:MM", the server defaults to now). */
+/** Next departures at a stop (and its siblings across the street), with real time. */
 export function getDepartures(
     stopId: string,
-    time: string | undefined,
-    limit = 10,
+    options: { time?: string; date?: string; limit?: number } = {},
     signal?: AbortSignal,
 ): Promise<DeparturesResponse> {
     return request<DeparturesResponse>(`/api/stops/${encodeURIComponent(stopId)}/departures`, {
-        query: { time, limit },
+        query: { time: options.time, date: options.date, limit: options.limit ?? 10 },
         signal,
     });
 }
@@ -151,13 +156,40 @@ export async function calculateRoutes(body: RouteRequest, signal?: AbortSignal):
     return unwrap<RouteResponse>(envelope);
 }
 
-export interface DataStatus {
-    loadedAt: string;
-    lines: number;
-    stops: number;
-    newestTimetable: string | null;
-}
-
 export async function getDataStatus(signal?: AbortSignal): Promise<DataStatus> {
     return unwrap<DataStatus>(await request<unknown>('/api/data/status', { signal }));
+}
+
+export function getLine(id: string, date?: string, signal?: AbortSignal): Promise<LineDetails> {
+    return request<LineDetails>(`/api/lines/${encodeURIComponent(id)}`, { query: { date }, signal });
+}
+
+export function getLineShape(id: string, date?: string, signal?: AbortSignal): Promise<LineShape> {
+    return request<LineShape>(`/api/lines/${encodeURIComponent(id)}/shape`, { query: { date }, signal });
+}
+
+export function getVehicles(signal?: AbortSignal): Promise<VehiclesResponse> {
+    return request<VehiclesResponse>('/api/realtime/vehicles', { signal });
+}
+
+export async function getAlerts(signal?: AbortSignal): Promise<ServiceAlert[]> {
+    return (await request<{ alerts: ServiceAlert[] }>('/api/realtime/alerts', { signal })).alerts;
+}
+
+export function getIsochrone(
+    origin: { stopId: string } | { lat: number; lon: number },
+    options: { time?: string; date?: string; maxDuration: number; maxTransfers?: number; wheelchair?: boolean },
+    signal?: AbortSignal,
+): Promise<IsochroneResponse> {
+    return request<IsochroneResponse>('/api/isochrone', {
+        query: {
+            ...('stopId' in origin ? { stopId: origin.stopId } : { lat: origin.lat.toFixed(6), lon: origin.lon.toFixed(6) }),
+            time: options.time,
+            date: options.date,
+            maxDuration: options.maxDuration,
+            maxTransfers: options.maxTransfers,
+            wheelchair: options.wheelchair ? 'true' : undefined,
+        },
+        signal,
+    });
 }

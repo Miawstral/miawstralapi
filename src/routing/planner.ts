@@ -281,7 +281,8 @@ export async function planJourneys(network: TransitNetwork, request: PlanRequest
         from,
         to,
         serviceDate: network.serviceDate,
-        departureTime: formatTime(request.departure),
+        // Arrive-by: the latest departure found (the requested time is in arrivalTime).
+        departureTime: request.arriveBy === undefined ? formatTime(request.departure) : (routes[0]?.departureTime ?? formatTime(request.arriveBy)),
         ...(request.arriveBy === undefined ? {} : { arrivalTime: formatTime(request.arriveBy) }),
         routes,
         alerts,
@@ -365,6 +366,7 @@ export async function planJourneys(network: TransitNetwork, request: PlanRequest
     }
 
     if (request.includeGeometry) await addGeometry(routes);
+    else routes.forEach(r => r.steps.forEach(s => delete s.geometry));
     const used = new Set(routes.flatMap(r => r.alerts));
     return response(routes, alerts.filter(a => used.has(a.id)));
 }

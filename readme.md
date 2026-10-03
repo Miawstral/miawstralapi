@@ -1,55 +1,38 @@
 ![](./Public/github_header.png)
 
-*Cette librairie **n'est en aucun cas** liée à [Réseau Mistral](https://www.reseaumistral.com/) et est réalisée en utilisant des données accessibles publiquement.*
+*Projet indépendant, **non affilié** au [Réseau Mistral](https://www.reseaumistral.com/). Il utilise les données ouvertes publiées par le réseau sur [transport.data.gouv.fr](https://transport.data.gouv.fr/datasets/reseau-de-transport-urbain-de-la-metropole-toulon-provence-mediterranee).*
 
 ---
 
-## Avant tout, qu'est-ce que le « Réseau Mistral » ?
+## Miawstral
 
-[Le Réseau Mistral](https://www.reseaumistral.com/) est le réseau de transport en commun de la métropole Toulon Provence Méditerranée. Il regroupe des bus, des bateaux-bus et des lignes scolaires desservant les communes de l'aire toulonnaise.
+Le [Réseau Mistral](https://www.reseaumistral.com/) est le réseau de transport en commun de la métropole Toulon Provence Méditerranée : bus, bateaux-bus et téléphérique du Faron. **Miawstral** en est une application web et une API publique, rapides et soignées :
 
-**Miawstral** fournit :
-
-- une **API REST** : arrêts, lignes, horaires, prochains départs et calcul d'itinéraires ;
-- un **calculateur d'itinéraires** basé sur l'algorithme [RAPTOR](./ROUTING_ALGORITHM.md), qui tient compte des vrais horaires, des correspondances et de la marche ;
-- une **interface web** (React + carte Leaflet) dans [`client/`](./client) ;
-- un **scraper** qui récupère les fiches horaires publiques du réseau.
+- **Itinéraires** calculés avec [RAPTOR](./ROUTING_ALGORITHM.md) sur les horaires officiels : correspondances, marche, bateaux-bus, « partir à » ou « arriver à », n'importe quel jour couvert par les horaires, option accessible en fauteuil roulant, tracés réels des lignes.
+- **Temps réel** : retards et courses supprimées dans les itinéraires et les prochains départs, **véhicules en direct sur la carte** (position GPS, cap, vitesse, retard), infos trafic.
+- **Prochains départs** à chaque arrêt, des deux côtés de la rue, avec favoris.
+- **Explorateur de lignes** : tracé officiel, arrêts, prochains passages, véhicules de la ligne en direct, perturbations.
+- **« Jusqu'où aller en 30 min ? »** : carte isochrone de tous les arrêts atteignables depuis un point.
+- **Recherche rapide ⌘K**, liens partageables pour chaque vue, export d'un trajet vers le calendrier, mode sombre, application installable (PWA).
+- **API documentée** sur [`/docs`](http://localhost:3000/docs), avec console d'essai en direct.
 
 ## Démarrage rapide
 
 ### Avec Docker : tout en une commande
 
-Prérequis : Docker avec Compose v2.
-
 ```bash
 docker compose up -d --build
 ```
 
-Puis ouvrez **http://localhost:3000** (interface web) ou **http://localhost:3000/api/docs** (documentation de l'API).
-
-Le compose lance tout ce qu'il faut :
+Ouvrez **http://localhost:3000** (application) et **http://localhost:3000/docs** (documentation de l'API).
 
 | Service | Rôle |
 | --- | --- |
-| `app` | API + interface web, sur le port 3000 |
-| `flaresolverr` | passe la protection Cloudflare pour récupérer les fiches horaires |
-| `osrm-prepare` | au premier lancement seulement : télécharge OpenStreetMap (≈ 80 Mo, département du Var), garde la zone de Toulon et prépare les graphes de calcul (quelques minutes) |
-| `osrm-foot`, `osrm-car` | tracés à pied et en bus sur la carte |
+| `app` | API + interface web. Télécharge les horaires officiels au démarrage puis les met à jour ; interroge le temps réel à la demande. |
+| `osrm-prepare` | Premier lancement seulement : télécharge OpenStreetMap (≈ 80 Mo, Var) et prépare les trajets à pied (environ une minute). |
+| `osrm-foot` | Tracés des trajets à pied sur la carte (les bus suivent les tracés officiels). |
 
-L'application est utilisable immédiatement. Au premier démarrage, elle récupère les horaires à jour des deux sens de chaque ligne en arrière-plan (environ 10 minutes, suivi sur `/api/data/status`), puis toutes les 24 h. En attendant, elle utilise les horaires fournis dans le dépôt. Les horaires et les graphes OSRM sont conservés dans des volumes Docker.
-
-Variables utiles, à mettre dans l'environnement ou dans `.env` :
-
-- `MIAWSTRAL_PORT` : port de l'interface (défaut 3000) ;
-- `ADMIN_TOKEN` : active `POST /api/data/refresh` ;
-- `AUTO_REFRESH_HOURS` : fréquence de mise à jour des horaires (défaut 24, 0 pour désactiver) ;
-- `OSM_BBOX` : zone de carte gardée pour OSRM.
-
-```bash
-docker compose logs -f app                       # suivre l'application
-docker compose down                              # arrêter (les données sont gardées)
-docker compose down -v                           # arrêter et tout effacer
-```
+Variables utiles : `MIAWSTRAL_PORT` (défaut 3000), `ADMIN_TOKEN` (active `POST /api/data/refresh`), `OSM_BBOX`. Toutes les options sont décrites dans [`.env.example`](./.env.example).
 
 ### Sans Docker
 
@@ -57,101 +40,70 @@ Prérequis : [Node.js](https://nodejs.org/) ≥ 20.12 et [bun](https://bun.sh/).
 
 ```bash
 bun run setup             # dépendances de l'API et de l'interface
-cp .env.example .env      # optionnel
-bun run dev               # API sur http://localhost:3000 + interface sur http://localhost:5173
+bun run dev               # API sur :3000 + interface sur http://localhost:5173
 ```
 
-Ouvrez **http://localhost:5173** : en développement, l'interface est servie par Vite (qui relaie `/api` vers le port 3000). `bun run dev:api` et `bun run client:dev` lancent chaque partie séparément.
-
-En production : `bun run client:build && bun run build && bun start`, l'API sert alors l'interface compilée sur `/`.
+En production : `bun run client:build && bun run build && bun start` (l'API sert l'interface sur `/`).
 
 ## API
 
-La documentation interactive (OpenAPI / Swagger) est servie sur [`/api/docs`](http://localhost:3000/api/docs).
+Documentation interactive : **`/docs`** (spécification OpenAPI : `/api/openapi.json`).
 
 | Méthode | Route | Description |
 | --- | --- | --- |
-| GET | `/api/health` | État du service et des données chargées |
-| GET | `/api/stops` | Tous les arrêts |
-| GET | `/api/stops/search?q=liberte` | Recherche d'arrêts (insensible aux accents) |
-| GET | `/api/stops/nearby?lat=&lon=&radius=` | Arrêts autour d'un point, du plus proche au plus loin |
-| GET | `/api/stops/:id` | Détail d'un arrêt, lignes et horaires de passage |
-| GET | `/api/stops/:id/departures?time=08:00` | Prochains départs |
-| GET | `/api/lines` | Toutes les lignes |
-| GET | `/api/lines/search?q=brusc` | Recherche de lignes |
-| GET | `/api/lines/:id` | Détail d'une ligne : sens, arrêts et horaires |
-| POST | `/api/routes/calculate` | Calcul d'itinéraires |
-| GET | `/api/data/status` | Données chargées et état du dernier rafraîchissement |
-| POST | `/api/data/refresh` | Rafraîchit les horaires (jeton admin requis) |
-
-Exemple :
+| GET | `/api/stops` · `/api/stops/search?q=` · `/api/stops/nearby?lat=&lon=` | Arrêts |
+| GET | `/api/stops/:id` | Arrêt, lignes et horaires de passage |
+| GET | `/api/stops/:id/departures?time=&date=` | Prochains départs **avec le temps réel** |
+| GET | `/api/lines` · `/api/lines/:id` · `/api/lines/:id/shape` | Lignes, arrêts et horaires, tracé officiel |
+| POST | `/api/routes/calculate` | Itinéraires (départ ou arrivée, date, PMR…) avec retards et alertes |
+| GET | `/api/isochrone?stopId=&maxDuration=` | Arrêts atteignables et temps de trajet |
+| GET | `/api/realtime/vehicles` | Véhicules en circulation (position, retard, prochain arrêt) |
+| GET | `/api/realtime/alerts` | Infos trafic |
+| GET | `/api/health` · `/api/data/status` | État du service et des données |
 
 ```bash
 curl -X POST http://localhost:3000/api/routes/calculate \
   -H 'Content-Type: application/json' \
-  -d '{ "from": { "stopId": "MISTRAL:SECENN" }, "to": { "lat": 43.0995, "lon": 5.88 }, "departureTime": "08:00" }'
+  -d '{ "from": { "stopId": "SECENN" }, "to": { "lat": 43.1255, "lon": 5.9301 }, "arrivalTime": "09:00" }'
 ```
 
-`from` et `to` acceptent un arrêt (`stopId`) ou des coordonnées (`lat`, `lon`). Options : `departureTime` (`HH:MM`, par défaut l'heure actuelle à Toulon), `maxTransfers` (0 à 4, défaut 2), `maxWalkingDistance` (m, défaut 800), `excludedLines`, `maxResults` (défaut 5), `includeGeometry` (défaut `true`).
+Les listes d'arrêts et de lignes sont compressées et servies avec `ETag` / `Cache-Control` ; les calculs d'itinéraires et d'isochrones sont limités à 120 requêtes par minute et par IP (`RATE_LIMIT_PER_MINUTE`).
 
-Chaque itinéraire indique ses heures de départ et d'arrivée, ses correspondances, la marche, et pour chaque trajet en bus les arrêts desservis avec leurs horaires. Les erreurs ont la forme `{ "success": false, "message": "..." }` avec un code HTTP adapté (400, 404…).
+## Données
 
-## Données et rafraîchissement
+| Source | Contenu | Mise à jour |
+| --- | --- | --- |
+| [GTFS](https://transport.data.gouv.fr/datasets/reseau-de-transport-urbain-de-la-metropole-toulon-provence-mediterranee) | Horaires théoriques, calendriers, arrêts, tracés, accessibilité, couleurs | Vérifiée toutes les 12 h (`GTFS_REFRESH_HOURS`), téléchargement conditionnel |
+| GTFS-RT VehiclePosition | Position des véhicules | À la demande, cache 10 s |
+| GTFS-RT TripUpdate | Retards, courses supprimées | À la demande, cache 20 s |
+| GTFS-RT Alert | Perturbations | À la demande, cache 2 min |
 
-Les fiches horaires sont publiées par Instant System derrière Cloudflare : le scraper passe par [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr). Il récupère les deux sens de chaque ligne (`OUTWARD` et `RETURN` sur le site) pour le **prochain jour ouvré** (`SCRAPER_DATE` pour en choisir un autre), en conservant les cases « - » des fiches pour que chaque colonne reste une course.
-
-Avec Docker, c'est automatique (voir plus haut). Sans Docker :
-
-```bash
-docker run -d -p 8191:8191 ghcr.io/flaresolverr/flaresolverr:latest
-bun run scrape              # lignes déjà connues
-bun run scrape -- --full    # toutes les lignes de 1 à 300, plus U
-bun run scrape -- 87 U      # seulement ces lignes
-```
-
-Ou via l'API, avec `ADMIN_TOKEN` défini :
-
-```bash
-curl -X POST "http://localhost:3000/api/data/refresh?mode=smart" -H "Authorization: Bearer $ADMIN_TOKEN"
-```
-
-Le rafraîchissement tourne en arrière-plan (suivi sur `/api/data/status`). Une ligne en échec garde son ancien fichier, et le réseau est rechargé à chaud à la fin.
-
-### Limites connues
-
-- **Horaires de semaine** : un seul jour est récupéré (le prochain jour ouvré). Les horaires du samedi, du dimanche et des vacances ne sont pas encore distingués.
-- **Données du dépôt** : les fichiers de `data/` sont à l'ancien format, sans le sens retour (déduit du sens aller et signalé `estimated: true`) et sans les cases « - » (courses reconstituées par alignement, voir [ROUTING_ALGORITHM.md](./ROUTING_ALGORITHM.md)). Un rafraîchissement les remplace par des données exactes.
-- Sans serveur [OSRM](https://project-osrm.org/) (`OSRM_FOOT_URL`, `OSRM_CAR_URL`), les trajets sont dessinés d'arrêt en arrêt.
-
-## Configuration
-
-Toutes les variables sont décrites dans [`.env.example`](./.env.example) : port, dossier des données, OSRM, FlareSolverr, rafraîchissement automatique, jeton admin, CORS, niveau de logs.
+Données publiées par le Réseau Mistral (RATP Dev) sous licence ouverte. Fonds de carte © [OpenFreeMap](https://openfreemap.org), © [OpenMapTiles](https://openmaptiles.org), © contributeurs [OpenStreetMap](https://www.openstreetmap.org/copyright).
 
 ## Développement
 
 ```bash
-bun run test        # tests (vitest) : algorithmes, scraper, intégrité des données, API
+bun run test        # tests (vitest) : GTFS, RAPTOR, temps réel, API
 bun run typecheck
-bun run build       # compile dans dist/
+bun run build
 ```
 
 ```
 src/
-  api/          routes Express, validation, documentation OpenAPI
-  network/      chargement des horaires, reconstitution des courses, modèle du réseau
-  routing/      RAPTOR, planification d'itinéraires, géométries OSRM
-  scraper/      scraper des fiches horaires et rafraîchissement
-  lib/          temps, géographie, logs, erreurs HTTP
-data/           horaires (<ligne>_horaires.json)
-client/         interface web React
-docker/osrm/    préparation des graphes OSRM
-tests/          tests vitest
+  gtfs/         lecture du GTFS, calendriers, réseau d'un jour de service
+  realtime/     flux GTFS-RT (véhicules, retards, alertes) et enrichissement
+  network/      modèle du réseau, tracés
+  routing/      RAPTOR, itinéraires, isochrones, géométries
+  api/          routes Express, validation, cache, limitation de débit, OpenAPI
+client/         application React (carte MapLibre/Leaflet, PWA) et page /docs
+docker/osrm/    préparation du graphe piéton OSRM
+tests/          tests vitest (mini GTFS de test dans tests/fixtures)
 ```
 
 ## Accès aux données
 
-A l'heure actuelle, `Miawstral` n'a accès à **aucune** de vos données personnelles, et n'y aura jamais accès : nous voulons rester respectueux de vos données. Le projet est, et restera, open-source.
+`Miawstral` n'a accès à **aucune** de vos données personnelles : les favoris et recherches récentes restent dans votre navigateur. Le projet est, et restera, open-source.
 
 ## Licence
 
-Le projet est sous licence GPL-3.0. Référez-vous au fichier [LICENSE](LICENSE) pour voir les conditions.
+GPL-3.0. Voir [LICENSE](LICENSE).

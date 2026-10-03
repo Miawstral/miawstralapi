@@ -181,3 +181,111 @@
         transition: none !important;
     }
 }
+
+/* Live vehicles */
+.vehicle-marker {
+    position: relative;
+    display: flex;
+    height: 28px;
+    width: 28px;
+    align-items: center;
+    justify-content: center;
+}
+
+.vehicle-badge {
+    display: inline-flex;
+    min-width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    padding: 0 4px;
+    background: var(--line);
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 0 2px hsl(var(--surface)), 0 2px 6px rgb(0 0 0 / 0.3);
+}
+
+.vehicle-marker.is-wide .vehicle-badge {
+    font-size: 10px;
+}
+
+.vehicle-arrow {
+    position: absolute;
+    inset: -7px;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    transition: transform 600ms ease;
+}
+
+.vehicle-arrow > span {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 7px solid;
+    filter: drop-shadow(0 0 1px hsl(var(--surface)));
+}
+
+.vehicle-popup-container .leaflet-popup-content {
+    margin: 0 !important;
+}
+
+.vehicle-popup {
+    @apply w-60 p-3.5 text-sm text-foreground;
+}
+
+.vehicle-popup-head {
+    @apply flex items-start gap-2.5 pr-6;
+}
+
+.vehicle-popup-title {
+    @apply text-[14px] font-semibold leading-tight;
+}
+
+.vehicle-popup-live {
+    @apply mt-1 flex items-center gap-1.5 text-xs text-muted-foreground;
+}
+
+.vehicle-popup-rows {
+    @apply mt-3 space-y-1.5 border-t pt-2.5 text-xs;
+}
+
+.vehicle-popup-rows > div {
+    @apply flex justify-between gap-3;
+}
+
+.vehicle-popup-rows span {
+    @apply text-muted-foreground;
+}
+
+.vehicle-popup-rows strong {
+    @apply text-right font-medium;
+}
+
+.vehicle-delay {
+    @apply font-semibold;
+}
+
+.vehicle-delay.is-late {
+    @apply text-amber-600 dark:text-amber-400;
+}
+
+.vehicle-delay.is-ontime {
+    @apply text-emerald-600 dark:text-emerald-400;
+}
+
+.live-dot {
+    @apply inline-block h-1.5 w-1.5 rounded-full bg-emerald-500;
+    box-shadow: 0 0 0 3px rgb(16 185 129 / 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vehicle-arrow {
+        transition: none;
+    }
+}

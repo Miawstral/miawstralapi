@@ -19,7 +19,7 @@ export interface RtVehicle {
     lat: number;
     lon: number;
     bearing: number | null;
-    /** m/s */
+    /** As sent by the feed (km/h for the Réseau Mistral, although GTFS-RT specifies m/s). */
     speed: number | null;
     stopId: string | null;
     status: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO' | null;

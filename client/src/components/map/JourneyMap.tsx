@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { LatLng, Popup as LeafletPopup } from 'leaflet';
 import { MapContainer, Popup, ZoomControl } from 'react-leaflet';
 import { usePrefersDark } from '@/hooks/useMediaQuery';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { TOULON_CENTER, type LatLngTuple } from '@/lib/geo';
 import { placeLatLng, pointPlace, stopLatLng, stopPlace, type PlaceSelection } from '@/lib/places';
-import type { LineSummary, RouteOption, StopSummary } from '@/types';
+import type { LineSummary, RouteOption, StopSummary, Vehicle } from '@/types';
 import { EndpointMarkers } from './EndpointMarkers';
 import { MapEvents, MapResizer, ViewController, type MapInsets } from './MapBehaviors';
 import { PointPopupContent } from './PointPopupContent';
@@ -13,6 +13,7 @@ import { RouteLayer } from './RouteLayer';
 import { StopPopupContent } from './StopPopupContent';
 import { StopsLayer } from './StopsLayer';
 import { VectorBasemap } from './VectorBasemap';
+import { VehiclesLayer } from './VehiclesLayer';
 
 const INITIAL_ZOOM = 13;
 
@@ -30,6 +31,12 @@ interface JourneyMapProps {
     /** "HH:MM" used for the departures shown in stop popups. */
     departuresTime: string;
     insets: MapInsets;
+    /** Live vehicles to draw (empty to hide them). */
+    vehicles: Vehicle[];
+    /** Restricts the vehicles to these lines. */
+    vehicleLines?: ReadonlySet<string> | null;
+    /** Extra layers of the current mode (line path, isochrone…). */
+    children?: ReactNode;
     onPickOrigin: (place: PlaceSelection) => void;
     onPickDestination: (place: PlaceSelection) => void;
 }
@@ -43,6 +50,9 @@ export function JourneyMap({
     destination,
     departuresTime,
     insets,
+    vehicles,
+    vehicleLines,
+    children,
     onPickOrigin,
     onPickDestination,
 }: JourneyMapProps) {
@@ -97,8 +107,10 @@ export function JourneyMap({
                 activeStopId={popup?.kind === 'stop' ? popup.stop.stopPointId : null}
                 dark={dark}
             />
+            {children}
             {route && <RouteLayer key={routeKey} route={route} dark={dark} />}
             <EndpointMarkers origin={origin} destination={destination} />
+            <VehiclesLayer vehicles={vehicles} lines={vehicleLines} animate={!reducedMotion} />
 
             {popup && (
                 <Popup

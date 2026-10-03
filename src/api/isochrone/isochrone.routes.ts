@@ -23,10 +23,11 @@ router.get('/', (req: Request, res: Response) => {
     const maxDuration = optionalNumber(req.query.maxDuration, 'maxDuration', { min: 5, max: 180, integer: true }) ?? 45;
     const maxTransfers = optionalNumber(req.query.maxTransfers, 'maxTransfers', { min: 0, max: 4, integer: true }) ?? 2;
     const wheelchair = optionalBoolean(req.query.wheelchair, 'wheelchair') ?? false;
+    const maxWalkingDistance = optionalNumber(req.query.maxWalkingDistance, 'maxWalkingDistance', { min: 0, max: 3000 }) ?? 600;
 
     const started = Date.now();
     const origin = resolvePlace(network, stopId ? { stopId } : { lat, lon });
-    const access = accessStops(network, origin, 600, wheelchair);
+    const access = accessStops(network, origin, maxWalkingDistance, wheelchair);
     const reach = reachability(network, { departure: minutes, access, maxTransfers, accessibleOnly: wheelchair });
 
     const stops = [];
@@ -44,6 +45,7 @@ router.get('/', (req: Request, res: Response) => {
         });
     }
     stops.sort((a, b) => a.duration - b.duration);
+    res.setHeader('Server-Timing', `isochrone;dur=${Date.now() - started}`);
     res.json({
         origin,
         serviceDate: date,

@@ -23,6 +23,15 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
       },
     },
+    // Two pages: the app and the API documentation (docs.html, served on /docs).
+    build: {
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          docs: path.resolve(__dirname, 'docs.html'),
+        },
+      },
+    },
     server: {
       proxy: {
         '/api': {

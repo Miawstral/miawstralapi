@@ -5,23 +5,25 @@ import type { LineSummary } from '@/types';
 interface LineBadgeProps {
     line: string;
     color?: string | null;
+    /** Official text color (else computed for contrast). */
+    textColor?: string | null;
     /** Accessible name, e.g. the line's full name. */
     title?: string;
-    size?: 'sm' | 'md';
+    size?: 'sm' | 'md' | 'lg';
     className?: string;
 }
 
-export function LineBadge({ line, color, title, size = 'sm', className }: LineBadgeProps) {
+export function LineBadge({ line, color, textColor, title, size = 'sm', className }: LineBadgeProps) {
     const background = lineColor(color);
     return (
         <span
             title={title}
             className={cn(
-                'inline-flex shrink-0 items-center justify-center rounded-[5px] font-semibold leading-none tracking-tight tnum shadow-[inset_0_0_0_1px_rgb(0_0_0/0.08)]',
-                size === 'sm' ? 'h-5 min-w-[1.375rem] px-1 text-[11px]' : 'h-6 min-w-[1.75rem] px-1.5 text-xs',
+                'inline-flex shrink-0 items-center justify-center rounded-[5px] font-semibold leading-none tracking-tight tnum shadow-[inset_0_0_0_1px_rgb(0_0_0/0.08)] dark:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.18)]',
+                size === 'sm' ? 'h-5 min-w-[1.375rem] px-1 text-[11px]' : size === 'md' ? 'h-6 min-w-[1.75rem] px-1.5 text-xs' : 'h-8 min-w-[2.5rem] px-2 text-sm',
                 className,
             )}
-            style={{ backgroundColor: background, color: textColorOn(background) }}
+            style={{ backgroundColor: background, color: textColor ?? textColorOn(background) }}
         >
             <span className="sr-only">Ligne </span>
             {line}
@@ -45,7 +47,7 @@ export function LineBadgeList({ lines, linesById, max = 6, className }: LineBadg
         <span className={cn('flex flex-wrap items-center gap-1', className)}>
             {visible.map(id => {
                 const line = linesById.get(id);
-                return <LineBadge key={id} line={id} color={line?.color} title={line?.lineName} />;
+                return <LineBadge key={id} line={id} color={line?.color} textColor={line?.textColor} title={line?.lineName} />;
             })}
             {hidden > 0 && (
                 <span className="text-2xs font-medium text-muted-foreground tnum">

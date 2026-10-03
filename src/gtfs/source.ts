@@ -39,7 +39,11 @@ export function sourceForDate(feed: GtfsFeed, date: string): NetworkSource {
         const sourceTrip: SourceTrip = {
             id: trip.id,
             direction: (trip.directionId === 1 ? 'INWARD' : 'OUTWARD') as Direction,
-            headsign: trip.headsign || (feed.stops.get(trip.stopIds[trip.stopIds.length - 1])?.name ?? ''),
+            // Some exports carry bus display codes ("994 Je ne suis pas en service"): use the terminus instead.
+            headsign:
+                trip.headsign && !/pas en service|^\d{3,}\s/i.test(trip.headsign)
+                    ? trip.headsign
+                    : (feed.stops.get(trip.stopIds[trip.stopIds.length - 1])?.name ?? trip.headsign),
             stops: trip.stopIds,
             times: trip.departures.map(s => Math.floor(s / 60)),
             shapeId: trip.shapeId,

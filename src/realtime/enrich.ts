@@ -101,7 +101,8 @@ export async function liveVehicles(network: TransitNetwork): Promise<{ updatedAt
             lat: v.lat,
             lon: v.lon,
             bearing: v.bearing,
-            speed: v.speed === null ? null : Math.round(v.speed * 3.6),
+            // The Mistral feed sends km/h, not the m/s of the GTFS-RT specification.
+            speed: v.speed === null ? null : Math.round(v.speed),
             delay,
             status: v.status,
             nextStop: stop ? { stopPointId: stop.id, name: stop.name } : null,

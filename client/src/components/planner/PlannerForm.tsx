@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownUp, ChevronDown, Clock3, LoaderCircle, LocateFixed, SlidersHorizontal } from 'lucide-react';
+import { Accessibility, ArrowDownUp, ChevronDown, Clock3, LoaderCircle, LocateFixed, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover } from '@/components/ui/popover';
 import { Segmented } from '@/components/ui/segmented';
@@ -11,7 +11,7 @@ import { DEFAULT_OPTIONS, TRANSFER_CHOICES, WALKING_CHOICES, type SearchOptions 
 import { cn } from '@/lib/utils';
 import { PlaceCombobox, type ExtraOption } from './PlaceCombobox';
 
-export type TimeMode = 'now' | 'at';
+export type TimeMode = 'now' | 'at' | 'arrive';
 
 interface PlannerFormProps {
     from: PlaceField;
@@ -23,6 +23,11 @@ interface PlannerFormProps {
     time: string;
     onTimeModeChange: (mode: TimeMode) => void;
     onTimeChange: (time: string) => void;
+    /** Service day YYYY-MM-DD, null for today. */
+    date: string | null;
+    onDateChange: (date: string | null) => void;
+    /** Days covered by the timetables. */
+    dateRange: { from: string | null; to: string | null };
     options: SearchOptions;
     onOptionsChange: (options: SearchOptions) => void;
     network: NetworkData;
@@ -40,6 +45,9 @@ export function PlannerForm({
     time,
     onTimeModeChange,
     onTimeChange,
+    date,
+    onDateChange,
+    dateRange,
     options,
     onOptionsChange,
     network,
@@ -129,11 +137,32 @@ export function PlannerForm({
             )}
 
             <div className="relative flex items-center gap-1.5">
-                <TimeControl mode={timeMode} time={time} onModeChange={onTimeModeChange} onTimeChange={onTimeChange} />
+                <TimeControl
+                    mode={timeMode}
+                    time={time}
+                    onModeChange={onTimeModeChange}
+                    onTimeChange={onTimeChange}
+                    date={date}
+                    onDateChange={onDateChange}
+                    dateRange={dateRange}
+                />
                 <OptionsControl options={options} onChange={onOptionsChange} />
             </div>
         </form>
     );
+}
+
+const dayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+const todayIso = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const addDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+function dayLabel(date: string | null): string {
+    if (!date || date === todayIso()) return '';
+    if (date === addDays(todayIso(), 1)) return 'demain';
+    return dayFormatter.format(new Date(`${date}T12:00:00`));
 }
 
 function TimeControl({
@@ -141,50 +170,97 @@ function TimeControl({
     time,
     onModeChange,
     onTimeChange,
+    date,
+    onDateChange,
+    dateRange,
 }: {
     mode: TimeMode;
     time: string;
     onModeChange: (mode: TimeMode) => void;
     onTimeChange: (time: string) => void;
+    date: string | null;
+    onDateChange: (date: string | null) => void;
+    dateRange: { from: string | null; to: string | null };
 }) {
+    const day = dayLabel(date);
+    const label =
+        mode === 'now' ? (
+            day ? `Partir ${day}` : 'Partir maintenant'
+        ) : (
+            <span>
+                {mode === 'arrive' ? 'Arriver à' : 'Départ à'} <span className="tnum">{time}</span>
+                {day && ` · ${day}`}
+            </span>
+        );
+    const today = todayIso();
+    const quickDays = [today, addDays(today, 1), addDays(today, 2)];
     return (
         <Popover
-            label="Heure de départ"
+            label="Date et heure"
             fullWidth
             trigger={props => (
                 <Button {...props} size="sm" variant="subtle" className="pl-2 pr-1.5">
                     <Clock3 aria-hidden="true" className="text-muted-foreground" />
-                    {mode === 'now' ? 'Partir maintenant' : <span>Départ à <span className="tnum">{time}</span></span>}
+                    {label}
                     <ChevronDown aria-hidden="true" className="text-muted-foreground" />
                 </Button>
             )}
         >
             <div className="space-y-3">
                 <Segmented
-                    label="Moment du départ"
+                    label="Moment"
                     value={mode}
                     onChange={next => {
-                        if (next === 'at' && !isValidTime(time)) onTimeChange(currentTime());
+                        if (next !== 'now' && !isValidTime(time)) onTimeChange(currentTime());
                         onModeChange(next);
                     }}
                     options={[
                         { value: 'now', label: 'Maintenant' },
                         { value: 'at', label: 'Partir à' },
+                        { value: 'arrive', label: 'Arriver à' },
                     ]}
                 />
-                <label className={cn('block space-y-1', mode === 'now' && 'opacity-50')}>
-                    <span className="text-xs font-medium text-muted-foreground">Heure de départ (aujourd’hui)</span>
-                    <input
-                        type="time"
-                        step={60}
-                        value={mode === 'now' ? currentTime() : time}
-                        disabled={mode === 'now'}
-                        onChange={event => {
-                            if (isValidTime(event.target.value)) onTimeChange(event.target.value);
-                        }}
-                        className="h-9 w-full rounded-lg bg-surface px-2.5 text-sm tnum shadow-control outline-none focus:shadow-[0_0_0_1px_hsl(var(--foreground)/0.4)]"
-                    />
-                </label>
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <label className="block space-y-1">
+                        <span className="text-xs font-medium text-muted-foreground">Jour</span>
+                        <input
+                            type="date"
+                            value={date ?? today}
+                            min={dateRange.from ?? undefined}
+                            max={dateRange.to ?? undefined}
+                            onChange={event => onDateChange(event.target.value && event.target.value !== today ? event.target.value : null)}
+                            className="h-9 w-full rounded-lg bg-surface px-2.5 text-sm tnum shadow-control outline-none focus:shadow-[0_0_0_1px_hsl(var(--foreground)/0.4)]"
+                        />
+                    </label>
+                    <label className={cn('block space-y-1', mode === 'now' && 'opacity-50')}>
+                        <span className="text-xs font-medium text-muted-foreground">Heure</span>
+                        <input
+                            type="time"
+                            step={60}
+                            value={mode === 'now' ? currentTime() : time}
+                            disabled={mode === 'now'}
+                            onChange={event => {
+                                if (isValidTime(event.target.value)) onTimeChange(event.target.value);
+                            }}
+                            className="h-9 w-28 rounded-lg bg-surface px-2.5 text-sm tnum shadow-control outline-none focus:shadow-[0_0_0_1px_hsl(var(--foreground)/0.4)]"
+                        />
+                    </label>
+                </div>
+                <div className="flex gap-1.5">
+                    {quickDays.map((d, i) => (
+                        <button
+                            key={d}
+                            type="button"
+                            onClick={() => onDateChange(i === 0 ? null : d)}
+                            className={cn(
+                                'h-7 rounded-full px-2.5 text-xs font-medium transition-colors',
+                                (date ?? today) === d ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground',
+                            )}
+                        >
+                            {i === 0 ? 'Aujourd’hui' : i === 1 ? 'Demain' : dayFormatter.format(new Date(`${d}T12:00:00`))}
+                        </button>
+                    ))}
+                </div>
             </div>
         </Popover>
     );
@@ -193,7 +269,8 @@ function TimeControl({
 function OptionsControl({ options, onChange }: { options: SearchOptions; onChange: (options: SearchOptions) => void }) {
     const modified =
         options.maxTransfers !== DEFAULT_OPTIONS.maxTransfers ||
-        options.maxWalkingDistance !== DEFAULT_OPTIONS.maxWalkingDistance;
+        options.maxWalkingDistance !== DEFAULT_OPTIONS.maxWalkingDistance ||
+        options.wheelchair !== DEFAULT_OPTIONS.wheelchair;
     return (
         <Popover
             label="Options de recherche"
@@ -225,6 +302,23 @@ function OptionsControl({ options, onChange }: { options: SearchOptions; onChang
                         options={WALKING_CHOICES.map(m => ({ value: m, label: formatDistance(m) }))}
                     />
                 </div>
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-subtle px-3 py-2.5 shadow-control">
+                    <span className="flex items-center gap-2 text-[13px]">
+                        <Accessibility className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        Accessible en fauteuil roulant
+                    </span>
+                    <input
+                        type="checkbox"
+                        role="switch"
+                        checked={options.wheelchair}
+                        onChange={event => onChange({ ...options, wheelchair: event.target.checked })}
+                        className="peer sr-only"
+                    />
+                    <span
+                        aria-hidden="true"
+                        className="relative h-5 w-9 rounded-full bg-border transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface after:shadow after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
+                    />
+                </label>
                 {modified && (
                     <Button size="sm" variant="ghost" className="-ml-2" onClick={() => onChange(DEFAULT_OPTIONS)}>
                         Réinitialiser

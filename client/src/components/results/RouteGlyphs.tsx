@@ -12,7 +12,7 @@ export function RouteGlyphs({ route }: { route: RouteOption }) {
                 <Fragment key={index}>
                     {index > 0 && <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/60" aria-hidden="true" />}
                     {step.type === 'bus' ? (
-                        <LineBadge line={step.line} color={step.color} title={step.lineName} />
+                        <LineBadge line={step.line} color={step.color} textColor={step.textColor} title={step.lineName} />
                     ) : (
                         <span className="inline-flex items-center gap-0.5 text-muted-foreground" title={`Marche ${step.duration} min`}>
                             <Footprints className="h-3.5 w-3.5" aria-hidden="true" />
