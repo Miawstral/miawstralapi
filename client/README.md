@@ -1,73 +1,48 @@
-# React + TypeScript + Vite
+# Miawstral · client web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interface web de Miawstral, le calculateur d'itinéraires du Réseau Mistral (Toulon) :
+recherche d'arrêts, calcul d'itinéraires, carte interactive (tracés, arrêts, prochains départs).
 
-Currently, two official plugins are available:
+Stack : Vite, React 19, TypeScript, Tailwind CSS, Leaflet (`react-leaflet`) avec un fond de carte
+vectoriel MapLibre ([OpenFreeMap](https://openfreemap.org), sans clé d'API), police Geist.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Design : carte plein écran, panneau flottant (tiroir sur mobile), palette neutre où seules les
+couleurs des lignes ressortent, thème clair/sombre selon le système. Les recherches sont
+partageables par l'URL (`?from=MISTRAL:SIBRUE&to=MISTRAL:TOLIBI&t=08:00`).
 
-## React Compiler
+## Démarrage
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+bun install
+bun run dev      # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Le serveur de développement redirige `/api` vers le backend sur `http://localhost:3000`.
+Depuis la racine du dépôt, `bun run dev` lance les deux à la fois.
+Si le backend tourne sur un autre port : `API_PROXY_TARGET=http://localhost:3001 bun run dev`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Build
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+bun run build    # vérification TypeScript + build dans dist/
+bun run lint
 ```
+
+Le backend sert automatiquement `client/dist` sur `/` quand ce dossier existe.
+
+## Configuration
+
+| Variable              | Rôle                                                                          |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `VITE_API_URL`        | URL du backend, si l'API n'est pas servie sur la même origine (défaut : vide). |
+| `API_PROXY_TARGET`    | Cible du proxy `/api` en développement (défaut : `http://localhost:3000`).     |
+
+Exemple : `VITE_API_URL=https://api.example.org bun run build`.
+
+## Organisation
+
+- `src/lib/api.ts` : client HTTP typé (gestion des erreurs `{ success: false, message }`).
+- `src/types.ts` : types de l'API, copiés de `src/interfaces/` du backend.
+- `src/components/planner` : formulaire (recherche d'arrêts, options).
+- `src/components/results` : liste des itinéraires et détail des étapes.
+- `src/components/map` : carte Leaflet (itinéraire, arrêts, popups).

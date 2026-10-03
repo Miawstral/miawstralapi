@@ -1,32 +1,16 @@
-# Ignore node_modules and build artifacts
-node_modules/
-dist/
-*.log
-
-# Ignore development files
-*.env
+**/node_modules
+dist
+client/dist
+.git
+.github
+.env
 .env.*
-
-# Ignore test files
-tests/
-*.test.js
-*.test.ts
-
-# Ignore documentation
-readme.md
-ROUTING_ALGORITHM.md
+!.env.example
+*.log
+coverage
+tests
+Public
+*.md
 LICENSE
-
-# Ignore git
-.git/
-.gitignore
-
-# Ignore IDE
-.vscode/
-.idea/
-
-# Ignore JavaScript sources (we only need the data)
-javascript/
-
-# Ignore Python
-python/
+docker-compose.yml
+Dockerfile

@@ -1,62 +1,183 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import 'leaflet/dist/leaflet.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-
+/*
+ * Design tokens. Neutral (zinc) surfaces, near-black actions, the line colors
+ * are the only saturated colors of the interface.
+ */
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 224 71.4% 4.1%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 220 14.3% 95.9%;
-    --secondary-foreground: 220.9 39.3% 11%;
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 220.9 39.3% 11%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262.1 83.3% 57.8%;
-    --radius: 0.5rem;
-  }
+    :root {
+        color-scheme: light;
+        --background: 0 0% 100%;
+        --surface: 0 0% 100%;
+        --subtle: 240 5% 97.5%;
+        --foreground: 240 10% 4%;
+        --muted: 240 5% 95.5%;
+        --muted-foreground: 240 4% 44%;
+        --accent: 240 5% 94%;
+        --accent-foreground: 240 6% 10%;
+        --border: 240 6% 90%;
+        --input: 240 6% 88%;
+        --ring: 240 6% 10%;
+        --primary: 240 6% 10%;
+        --primary-foreground: 0 0% 98%;
+        --brand: 221 83% 53%;
+        --warning: 32 95% 40%;
+        --danger: 0 72% 46%;
+        --radius: 0.625rem;
+        --map-bg: #f5f5f4;
+    }
 
-  .dark {
-    --background: 224 71.4% 4.1%;
-    --foreground: 210 20% 98%;
-    --card: 224 71.4% 4.1%;
-    --card-foreground: 210 20% 98%;
-    --popover: 224 71.4% 4.1%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 263.4 70% 50.4%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 215 27.9% 16.9%;
-    --secondary-foreground: 210 20% 98%;
-    --muted: 215 27.9% 16.9%;
-    --muted-foreground: 217.9 10.6% 64.9%;
-    --accent: 215 27.9% 16.9%;
-    --accent-foreground: 210 20% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 215 27.9% 16.9%;
-    --input: 215 27.9% 16.9%;
-    --ring: 263.4 70% 50.4%;
-  }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            color-scheme: dark;
+            --background: 240 6% 6%;
+            --surface: 240 6% 8%;
+            --subtle: 240 5% 10%;
+            --foreground: 0 0% 96%;
+            --muted: 240 4% 13%;
+            --muted-foreground: 240 5% 62%;
+            --accent: 240 4% 15%;
+            --accent-foreground: 0 0% 96%;
+            --border: 240 4% 17%;
+            --input: 240 4% 20%;
+            --ring: 0 0% 90%;
+            --primary: 0 0% 96%;
+            --primary-foreground: 240 6% 8%;
+            --brand: 217 91% 64%;
+            --warning: 38 92% 58%;
+            --danger: 0 84% 66%;
+            --map-bg: #1b1b1d;
+        }
+    }
+
+    * {
+        @apply border-border;
+    }
+
+    html,
+    body,
+    #root {
+        height: 100%;
+    }
+
+    body {
+        @apply bg-background font-sans text-foreground antialiased;
+        font-feature-settings: 'ss01', 'cv11';
+        text-rendering: optimizeLegibility;
+    }
+
+    :focus-visible {
+        outline: 2px solid hsl(var(--ring) / 0.9);
+        outline-offset: 2px;
+    }
+
+    /* Times and durations line up. */
+    .tnum {
+        font-variant-numeric: tabular-nums;
+    }
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
+@layer components {
+    .skeleton {
+        @apply rounded-md bg-muted;
+        background-image: linear-gradient(90deg, transparent 0%, hsl(var(--accent)) 50%, transparent 100%);
+        background-size: 200% 100%;
+    }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Outfit', sans-serif;
-  }
+    @media (prefers-reduced-motion: no-preference) {
+        .skeleton {
+            @apply animate-shimmer;
+        }
+    }
+
+    .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: hsl(var(--border)) transparent;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+ * Leaflet, aligned with the design system
+ * ------------------------------------------------------------------------ */
+
+.leaflet-container {
+    background: var(--map-bg);
+    font-family: inherit;
+    font-size: 0.875rem;
+}
+
+.leaflet-control-zoom.leaflet-bar {
+    @apply overflow-hidden rounded-lg border-0 shadow-pop;
+}
+
+.leaflet-control-zoom.leaflet-bar a {
+    @apply flex h-9 w-9 items-center justify-center border-b border-border bg-surface text-lg font-normal leading-none text-foreground transition-colors;
+}
+
+.leaflet-control-zoom.leaflet-bar a:last-child {
+    @apply border-b-0;
+}
+
+.leaflet-control-zoom.leaflet-bar a:hover {
+    @apply bg-muted text-foreground;
+}
+
+.leaflet-control-attribution.leaflet-control {
+    @apply rounded-tl-md bg-surface/80 px-1.5 text-2xs text-muted-foreground backdrop-blur;
+}
+
+.leaflet-control-attribution a {
+    @apply text-muted-foreground underline-offset-2 hover:underline;
+}
+
+.leaflet-control-scale-line {
+    @apply rounded-sm border-foreground/40 bg-surface/80 text-2xs text-foreground backdrop-blur;
+}
+
+.leaflet-popup-content-wrapper {
+    @apply rounded-xl bg-surface p-0 text-foreground shadow-pop;
+}
+
+.leaflet-popup-content {
+    margin: 0 !important;
+    line-height: inherit;
+}
+
+.leaflet-popup-tip {
+    @apply bg-surface shadow-none;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+    @apply right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-lg font-normal text-muted-foreground hover:bg-muted hover:text-foreground;
+}
+
+.leaflet-tooltip {
+    @apply rounded-md border-0 bg-primary px-2 py-1 text-xs font-medium text-primary-foreground shadow-pop;
+}
+
+.leaflet-tooltip-top::before {
+    border-top-color: hsl(var(--primary));
+}
+
+.leaflet-tooltip-bottom::before {
+    border-bottom-color: hsl(var(--primary));
+}
+
+/* Map markers (divIcons) */
+.map-marker {
+    background: none;
+    border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .leaflet-fade-anim .leaflet-popup,
+    .leaflet-zoom-anim .leaflet-zoom-animated {
+        transition: none !important;
+    }
 }

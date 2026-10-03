@@ -1,39 +1,27 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
-import cors from 'cors';
-// routes 
-import lineRouter from './api/lines/lines.routes';
-import stopsRouter from './api/stops/stops.routes';
-import cacheRouter from './api/cache/cache.routes';
-import routesRouter from './api/routes/routes.routes';
-import mapRouter from './pages/map/map'
-// pages 
-import mainPage from './pages/main';
-const app: Application = express();
-const PORT = process.env.PORT || 3000;
+import { createApp } from './app';
+import { config } from './config';
+import { createLogger } from './lib/logger';
+import { getNetwork } from './network/network.store';
+import { startAutoRefresh, stopAutoRefresh } from './scraper/refresh.service';
 
+const log = createLogger('server');
 
-app.use(cors());
-app.use(express.json());
+// Load the timetables before accepting requests.
+const network = getNetwork();
+if (network.lines.size === 0) log.warn(`No timetable found in ${config.dataDir}: run "npm run scrape -- --full"`);
 
-
-app.use('/api/lines', lineRouter);
-app.use('/api/stops', stopsRouter);
-app.use('/api/routes', routesRouter);
-app.use('/refresh', cacheRouter);
-app.use('/', mapRouter);
-
-
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-    console.error(`[ERROR] ${req.method} ${req.path} - ${err.message}`)
-
-    const errorMessage = process.env.NODE_ENV === 'production' ? 'An internal server error occured' : err.message;
-    res.status(500).json({
-        success: false,
-        message: errorMessage,
-    })
+const server = createApp().listen(config.port, () => {
+    log.info(`Miawstral is running on http://localhost:${config.port} (docs: /api/docs)`);
+    if (!config.osrm.enabled) log.info('OSRM disabled: itineraries use straight lines (set OSRM_URL to enable).');
+    if (!config.adminToken) log.info('ADMIN_TOKEN not set: data refresh endpoints are disabled.');
+    startAutoRefresh();
 });
 
-
-app.listen(PORT, () => {
-    console.log(`[📦] Miawstral is running on http://localhost:${PORT}`);
-});
+function shutdown(signal: string): void {
+    log.info(`${signal} received, shutting down`);
+    stopAutoRefresh();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 10_000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

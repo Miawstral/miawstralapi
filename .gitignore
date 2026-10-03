@@ -1,18 +1,25 @@
-# Miawstral custom files
-javascript/miawstral.js
-javascript/*.js
-javascript/data/*.json 
-javascript/loaders/load_data.js
-javascript/loaders/load_one.js
-javascript/loaders/miawstral.js
-
-
-# node modules
+# Dependencies
 node_modules/
+
+# Build output
+dist/
+client/dist/
+*.tsbuildinfo
+
+# Local configuration (copy .env.example)
+.env
+.env.local
+
+# Logs, temporary files
+*.log
+*.tmp
+coverage/
+
+# Local FlareSolverr installs
 flaresolverr/
 flaresolverr_windows_x64/
 flaresolverr_windows_x64.zip
-bun.lockb
+
+# Lockfiles of other package managers (the project uses bun.lock)
 package-lock.json
-Errors/
-bun.lock
+bun.lockb

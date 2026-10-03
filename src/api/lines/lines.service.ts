@@ -1,83 +1,63 @@
-import fs from 'fs';
-import path from 'path';
-import { BusLine } from '../../interfaces/BusData';
+import type { LineDetails, LineDirectionSummary, LineSummary } from '../../interfaces/BusData';
+import { notFound } from '../../lib/http-error';
+import { normalizeText } from '../../lib/text';
+import { formatTime } from '../../lib/time';
+import type { LineDirection, NetworkLine, TransitNetwork } from '../../network/network';
 
-
-
-const dataDir = path.join(__dirname, '../../data');
-
-let linesCache: Partial<BusLine>[] | null = null;
-let cacheTimestamp: number | null = null;
-const CACHE_TTL: number = 10 * 60 * 1000;
-/**
- * Reads all available bus line files and returns a summary.
- */
-export const getAllLines = async (): Promise<Partial<BusLine>[]> => {
-  const now = Date.now();
-
-  if (linesCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_TTL) {
-    console.log('[CACHE] Returning lines from cache.')
-    return linesCache;
-  }
-  console.log('[FILESYS] Reading lines from files.');
-  const files = fs.readdirSync(dataDir).filter(file => file.endsWith('_horaires.json'));
-  const lines: Partial<BusLine>[] = [];
-
-  for(const file of files) {
-    const filePath = path.join(dataDir, file);
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    const data: BusLine = JSON.parse(fileContent);
-    lines.push({
-      bus_id: data.bus_id,
-      lineName: data.lineName,
-    });
-  }
-
-  linesCache = lines;
-  cacheTimestamp = now;
-  return lines;
-};
-
-/**
- * 
- * Invalidate cache manually to avoid having wrong data and force refreshing cache.
- * @returns void
- */
-
-export const invalidateCache = (): void => {
-  linesCache = null;
-  cacheTimestamp = null;
-  console.log('[CACHE] Lines cache invalidated.');
+function directionSummary(dir: LineDirection): LineDirectionSummary {
+    return { direction: dir.direction, headsign: dir.headsign, estimated: dir.estimated, trips: dir.trips.length };
 }
 
-/**
- * Reads a specific bus line file by its ID.
- */
-export const getLineById = async (id: string): Promise<BusLine> => {
-  if (!/^[a-zA-Z0-9]+$/.test(id)){
-    throw new Error('Invalid line ID format.');
-  }
-  const filePath = path.join(dataDir, `${id}_horaires.json`);
+function toLineSummary(line: NetworkLine): LineSummary {
+    return {
+        bus_id: line.id,
+        lineName: line.name,
+        lineId: line.lineId,
+        color: line.color,
+        directions: line.directions.map(directionSummary),
+    };
+}
 
-  if (!fs.existsSync(filePath)) {
-    throw new Error('Line not found');
-  }
+export function listLines(network: TransitNetwork): LineSummary[] {
+    return [...network.lines.values()].map(toLineSummary);
+}
 
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
-  return JSON.parse(fileContent);
-};
+export function searchLines(network: TransitNetwork, query: string): LineSummary[] {
+    const q = normalizeText(query);
+    return [...network.lines.values()]
+        .filter(line => line.id.toLowerCase() === q || normalizeText(line.name).includes(q))
+        .map(toLineSummary);
+}
 
-/**
- * Searches for lines by name. 
- * @param {string} query  - The Search query 
- * @returns {Promise<Partial<BusLine>[]>} A list of matching line summaries. 
- */
+export function getLineDetails(network: TransitNetwork, id: string): LineDetails {
+    const line = network.getLine(id);
+    if (!line) throw notFound(`Line not found: ${id}`);
 
-export const searchLinesByName = async (query: string): Promise<Partial<BusLine>[]> => {
-  const allLines = await getAllLines(); 
-  const lowerCaseQuery = query.toLowerCase(); 
-
-  return allLines.filter(line => 
-    line.lineName?.toLowerCase().includes(lowerCaseQuery)
-  )
+    const { directions: _, ...summary } = toLineSummary(line);
+    return {
+        ...summary,
+        notes: line.notes,
+        cachedAt: line.cachedAt,
+        directions: line.directions.map(dir => ({
+            ...directionSummary(dir),
+            stops: [...new Set(dir.stops)].map(index => {
+                const stop = network.stops[index];
+                const times = new Set<number>();
+                for (const trip of dir.trips) {
+                    trip.stops.forEach((s, pos) => {
+                        if (s === index) times.add(trip.times[pos]);
+                    });
+                }
+                return {
+                    stopPointId: stop.id,
+                    name: stop.name,
+                    city: stop.city,
+                    latitude: String(stop.lat),
+                    longitude: String(stop.lon),
+                    accessible: stop.accessible,
+                    times: [...times].sort((a, b) => a - b).map(formatTime),
+                };
+            }),
+        })),
+    };
 }

@@ -1,13 +1,12 @@
-import { Router } from "express"; 
-import * as stopsController from "./stops.controller"
+import { Router } from 'express';
+import * as stopsController from './stops.controller';
 
+const router = Router();
 
-const router = Router(); 
+router.get('/', stopsController.getAll);
+router.get('/search', stopsController.search);
+router.get('/nearby', stopsController.findNearby);
+router.get('/:id/departures', stopsController.getDepartures);
+router.get('/:id', stopsController.getById);
 
-router.get('/', stopsController.getAll); 
-router.get('/search', stopsController.search)
-router.get('/nearby', stopsController.findNearby)
-router.get("/:id", stopsController.getById); 
-
-export default router; 
-
+export default router;

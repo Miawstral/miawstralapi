@@ -1,39 +1,49 @@
 {
   "name": "reseau-miawstral",
-  "version": "1.0.0",
-  "description": "API pour le Réseau Mistral de la métropole Toulon Provence Méditerranée.",
+  "version": "2.0.0",
+  "description": "API et calculateur d'itinéraires pour le Réseau Mistral de la métropole Toulon Provence Méditerranée.",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=20.12"
+  },
   "scripts": {
+    "setup": "bun install && cd client && bun install",
+    "dev": "concurrently -k -n api,web -c blue,magenta \"bun run dev:api\" \"bun run client:dev\"",
+    "dev:api": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "scrape": "tsx src/scraper/cli.ts",
+    "client:dev": "cd client && bun run dev",
+    "client:build": "cd client && bun install --frozen-lockfile && bun run build"
   },
   "keywords": [
     "reseau-mistral",
     "api",
     "toulon",
-    "bus"
+    "bus",
+    "raptor"
   ],
   "author": "Ivy-Js",
   "license": "GPL-3.0-or-later",
   "dependencies": {
-    "axios": "^1.9.0",
     "cheerio": "^1.0.0",
-    "colors": "^1.4.0",
     "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "puppeteer": "^24.10.0",
-    "swagger-jsdoc": "^6.2.8",
+    "express": "^5.1.0",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/node": "^20.14.2",
-    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/supertest": "^7.2.1",
     "@types/swagger-ui-express": "^4.1.8",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.4.5"
+    "concurrently": "^10.0.5",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.3"
   }
 }

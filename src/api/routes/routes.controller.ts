@@ -1,38 +1,13 @@
-import { Request, Response, NextFunction, Router } from "express";
-import * as routesService from './routes.service';
-import { RouteRequest } from "../../interfaces/Route";
+import type { Request, Response } from 'express';
+import { config } from '../../config';
+import { nowInTimezone } from '../../lib/time';
+import { getNetwork } from '../../network/network.store';
+import { planJourneys } from '../../routing/planner';
+import { parseRouteRequest } from './routes.validation';
 
-export const calculate = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const request: RouteRequest = req.body;
-
-        if (!request.from || !request.to) {
-            return res.status(400).json({
-                success: false,
-                message: "Both 'from' and 'to' are required."
-            });
-        }
-        if (!request.from.lat && !request.from.stopId) {
-            return res.status(400).json({
-                success: false,
-                message: "'from' must have either lat/lon or stopId"
-            });
-        }
-
-        if (!request.to.lat && !request.to.stopId){
-            return res.status(400).json({
-                success: false,
-                message: "'to' must have either lat/lon or stopId"
-            });
-        }
-        
-        const result = await routesService.calculateRoutes(request);
-        
-        res.status(200).json({
-            success: true,
-            data: result
-        });
-    } catch (error) {
-        next(error);
-    }
-}
+export const calculate = async (req: Request, res: Response) => {
+    const request = parseRouteRequest(req.body, nowInTimezone(config.timezone));
+    const result = await planJourneys(getNetwork(), request);
+    res.setHeader('Server-Timing', `route;dur=${result.calculationTime}`);
+    res.json({ success: true, data: result });
+};

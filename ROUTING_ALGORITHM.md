@@ -1,111 +1,64 @@
-# Algorithme de Routage - Réseau Mistral
+# Calcul d'itinéraires — Réseau Mistral
 
-## Architecture
+Le calcul se fait en trois temps : les fiches horaires sont transformées en **courses**, regroupées en **motifs** au démarrage ; chaque requête lance ensuite **RAPTOR** plusieurs fois pour proposer des alternatives.
 
-Ce système utilise un **algorithme hybride optimisé** inspiré du **Connection Scan Algorithm (CSA)** utilisé par les applications professionnelles de transport en commun.
+## 1. Des fiches horaires aux courses
 
-## Composants
+`src/network/trip-builder.ts`
 
-### 1. Connection Scan Algorithm (CSA)
-**Fichier:** `routing-algorithm.service.ts`
+Une fiche horaire est une grille : une ligne par arrêt, une colonne par course, « - » quand la course ne dessert pas l'arrêt. Une **course** est la suite `(arrêt, heure)` d'un véhicule.
 
-#### Principe
-- Chaque "connection" = un bus allant d'un arrêt A à B à une heure précise
-- Base de données pré-calculée de toutes les connections possibles
-- Recherche par nombre de correspondances (0, 1, 2...)
+- **Format v2** (scraper actuel) : les « - » sont conservés (`null`), chaque colonne est donc une course.
+- **Format v1** (données historiques) : les « - » avaient été supprimés. Les heures d'un arrêt restent dans l'ordre des colonnes, mais on ne sait plus à quelle colonne chacune appartient. L'ancien code associait `times[i]` d'un arrêt à `times[i]` du suivant, ce qui donnait des horaires incohérents sur 22 des 45 lignes (branches, services partiels).
 
-#### Avantages
-- ✅ **Optimal garanti** : trouve toujours le meilleur chemin
-- ✅ **Ultra rapide** : O(n) où n = nombre de connections scannées
-- ✅ **Basé sur les horaires réels** : pas d'approximation
-- ✅ **Priorise les lignes directes** : cherche d'abord 0 correspondance, puis 1, puis 2
+  Les courses sont reconstituées arrêt par arrêt par un **alignement qui préserve l'ordre** (programmation dynamique, comme une distance d'édition) entre les courses en cours et les heures de l'arrêt :
+  - prolonger une course coûte le nombre de minutes écoulées (au plus 30 min, plus 3 min par arrêt sauté, plafonné à 60) ;
+  - commencer une nouvelle course coûte 30 ;
+  - une course peut sauter l'arrêt sans coût.
 
-#### Complexité
-- Preprocessing : O(S × T) où S = arrêts, T = horaires (fait une fois au démarrage)
-- Requête : O(C) où C = connections scannées
-- Mémoire : ~10-50MB pour un réseau urbain typique
+  Sur les données du dépôt, 99,9 % des horaires sont rattachés à une course et le nombre de courses correspond au nombre de colonnes des fiches (vérifié par `tests/data.test.ts`).
 
-### 2. Round-Based Public Transit Routing (inspiré de RAPTOR)
-**Utilisé dans:** `findJourneyWithNTransfers()`
+Les courses qui passent minuit sont « déroulées » (`23:55 → 24:05`). Quand un seul sens d'une ligne est connu, le sens opposé est **estimé** en inversant les courses (mêmes temps de parcours, mêmes heures de départ depuis l'autre terminus) et marqué `estimated`.
 
-#### Principe
-- Itération par "round" = par nombre de correspondances
-- Round 0 : lignes directes uniquement
-- Round 1 : trajet avec 1 correspondance
-- Round 2 : trajet avec 2 correspondances
+## 2. Le modèle du réseau
 
-#### Avantages
-- ✅ Garantit le nombre minimal de correspondances
-- ✅ Efficace pour les petits réseaux (< 2000 arrêts)
-- ✅ Facile à comprendre et debugger
+`src/network/network.ts`, construit une fois au démarrage (≈ 150 ms) puis après chaque rafraîchissement :
 
-### 3. Optimisations Implémentées
+- **arrêts** indexés par identifiant, avec les lignes qui les desservent ;
+- **motifs** (*routes* dans RAPTOR) : courses d'une même ligne ayant exactement la même suite d'arrêts, triées par heure de départ. Quand aucune course n'en dépasse une autre (propriété FIFO), la recherche de la première course utilisable est une recherche dichotomique ;
+- **correspondances à pied** entre arrêts distants de moins de 300 m (distance à vol d'oiseau × 1,3, à 4,8 km/h).
 
-#### Merge Connections
-```typescript
-journeyToSteps(journey)
-```
-Fusionne les connections consécutives sur la même ligne pour éviter d'afficher :
-- ❌ Bus 81 : A → B (1 arrêt)
-- ❌ Bus 81 : B → C (1 arrêt)
-- ✅ Bus 81 : A → C (2 arrêts)
+## 3. RAPTOR
 
-#### Scoring Intelligent
-```typescript
-transferScore = transfers × 1800
-durationScore = duration × 1
-```
-Une correspondance coûte l'équivalent de **30 minutes** :
-- Ligne directe de 45 min >> Trajet avec 1 correspondance de 30 min
-- Comportement similaire à Google Maps / Citymapper
+`src/routing/raptor.ts` — *Round-bAsed Public Transit Optimized Router*, [Delling, Pajor, Werneck, 2012](https://www.microsoft.com/en-us/research/wp-content/uploads/2012/01/raptor_alenex.pdf).
 
-#### Validation des Horaires
-- Rejette les durées aberrantes (< 1 min ou > 120 min entre arrêts)
-- Gère la traversée de minuit (23:50 → 00:10)
-- Valide que départ < arrivée pour chaque connection
+Le tour *k* calcule l'heure d'arrivée au plus tôt à chaque arrêt en empruntant au plus *k* véhicules :
 
-## Comparaison avec d'autres algorithmes
+1. on parcourt chaque motif passant par un arrêt amélioré au tour précédent, à partir de cet arrêt ;
+2. le long du motif, on garde la course la plus tôt possible : on y monte si on est à l'arrêt avant son passage (avec **2 min de correspondance** minimum après un autre bus) et on améliore les arrêts suivants ;
+3. on relâche les correspondances à pied depuis les arrêts atteints en bus.
 
-| Algorithme | Temps | Optimalité | Complexité | Utilisé par |
-|------------|-------|------------|------------|-------------|
-| **CSA** (notre choix) | O(C) | ✅ Optimal | Simple | Öffi, Rome2Rio |
-| **RAPTOR** | O(R × S) | ✅ Optimal | Moyenne | Google Maps |
-| **Transfer Patterns** | O(1)* | ✅ Optimal | Complexe | Uber, Lyft |
-| **A*** | O(E log V) | ❌ Sous-optimal | Simple | Navigation GPS |
-| **Dijkstra** | O(E log V) | ⚠️ Sans horaires | Simple | OpenStreetMap |
+Le départ et l'arrivée sont des ensembles d'arrêts accessibles à pied (`maxWalkingDistance`). Les élagages classiques sont appliqués : on n'améliore un arrêt que si on bat la meilleure heure connue à cet arrêt *et* la meilleure heure d'arrivée à destination.
 
-*après preprocessing lourd
+À la fin de chaque tour, si la destination est atteinte plus tôt qu'avec moins de véhicules, on obtient un nouvel itinéraire **Pareto-optimal** (heure d'arrivée, nombre de correspondances) : par exemple un direct à 7 h 30 et un trajet avec une correspondance à 7 h 14.
 
-## Performance Attendue
+## 4. Itinéraires proposés
 
-### Réseau Mistral (estimations)
-- Arrêts : ~1060
-- Lignes : ~55
-- Connections : ~50,000-100,000
-- Preprocessing : **~2-5 secondes** au démarrage
-- Requête moyenne : **< 100ms**
-- Requête complexe : **< 500ms**
+`src/routing/planner.ts`
 
-### Optimisations Futures Possibles
-1. **Cache des journeys fréquents** (A→B populaires)
-2. **Spatial indexing** (R-tree pour recherche géographique)
-3. **Parallel scanning** (multi-threading pour grandes requêtes)
-4. **Transfer Patterns** (si le réseau devient très grand)
+- RAPTOR est relancé juste après le départ le plus tôt trouvé, jusqu'à 8 fois, pour proposer les départs suivants.
+- Les itinéraires dominés (partir plus tôt pour arriver plus tard avec autant de correspondances) sont écartés, ainsi que ceux plus lents que la marche.
+- Un itinéraire **entièrement à pied** est proposé quand la destination est à moins de 2 km.
+- On part « juste à temps » : l'heure de départ affichée est celle où il faut quitter le point de départ pour attraper le premier bus.
+- Les tracés sont demandés à OSRM en parallèle (un appel par étape, avec tous les arrêts intermédiaires), mis en cache, et ignorés pendant une minute si OSRM ne répond pas. Sans OSRM, les trajets passent par les coordonnées des arrêts.
 
-## Pourquoi pas A* ?
+## Performances
 
-A* est excellent pour :
-- ✅ Navigation routière (heuristique = distance à vol d'oiseau)
-- ✅ Jeux vidéo (pathfinding sur grille)
-- ✅ Robotique (espace continu)
+Sur le réseau actuel (45 lignes, 1 060 arrêts, ≈ 3 200 courses, ≈ 250 motifs), une requête complète prend entre 2 et 20 ms sans les tracés OSRM.
 
-Mais **inadapté** pour le transport en commun :
-- ❌ L'heuristique spatiale ne fonctionne pas (un arrêt proche géographiquement peut être très loin en temps)
-- ❌ Ne gère pas naturellement les horaires
-- ❌ Peut manquer des solutions optimales (exemple : petit détour → ligne directe)
+## Pistes
 
-## Références
-
-- [Connection Scan Algorithm Paper](https://arxiv.org/abs/1703.05997)
-- [RAPTOR Algorithm](https://www.microsoft.com/en-us/research/wp-content/uploads/2012/01/raptor_alenex.pdf)
-- [Google Maps Routing](https://blog.google/products/maps/google-maps-101-how-we-map/)
+- Requête « arriver avant » (RAPTOR inversé).
+- Calendriers (semaine, week-end, vacances scolaires) dès que le scraper récupère plusieurs dates.
+- rRAPTOR (*range RAPTOR*) pour obtenir tous les départs d'une plage horaire en un seul calcul.
+- Temps de marche issus d'OSRM dans le calcul, et plus seulement pour l'affichage.

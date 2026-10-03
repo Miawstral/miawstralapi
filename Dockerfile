@@ -1,41 +1,44 @@
-# Multi-stage build for miawstralapi
-FROM oven/bun:latest AS builder
+# syntax=docker/dockerfile:1
 
-WORKDIR /app
-
-# Copy package files
-COPY package.json bun.lockb* ./
-
-# Install dependencies
+# --- React client -----------------------------------------------------------
+FROM oven/bun:1 AS client
+WORKDIR /app/client
+COPY client/package.json client/bun.lock ./
 RUN bun install --frozen-lockfile
-
-# Copy source code
-COPY . .
-
-# Build TypeScript
+COPY client/ ./
 RUN bun run build
 
-# Production stage
-FROM oven/bun:latest
+# --- API (TypeScript → dist/) ----------------------------------------------
+FROM oven/bun:1 AS server
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+COPY tsconfig.json tsconfig.build.json ./
+COPY src ./src
+RUN bun run build
 
+FROM oven/bun:1 AS prod-deps
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+# --- Runtime ----------------------------------------------------------------
+FROM node:22-alpine
+ENV NODE_ENV=production \
+    PORT=3000 \
+    DATA_DIR=/app/data \
+    CLIENT_DIR=/app/client/dist
 WORKDIR /app
 
-# Copy package files
-COPY package.json bun.lockb* ./
+COPY package.json ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=server /app/dist ./dist
+COPY --from=client /app/client/dist ./client/dist
+COPY --chown=node:node data ./data
 
-# Install production dependencies only
-RUN bun install --production --frozen-lockfile
-
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src/data ./src/data
-
-# Expose port
+USER node
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:' + process.env.PORT + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD bun run -e "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
-
-# Start server
-CMD ["bun", "run", "start"]
+CMD ["node", "dist/server.js"]
